@@ -1,9 +1,7 @@
 package org.phoenixframework.channels;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 import java.util.logging.Logger;
 
 public class Channel {
@@ -20,10 +18,15 @@ public class Channel {
 
     private String topic;
     private Message message;
-    private PhoenixSocket socket;
+    private PhxSocket socket;
     private List<Binding> bindings = new ArrayList<Binding>();
 
-    public Channel(final String topic, final Message message, final PhoenixSocket socket) {
+    /**
+     * TODO - Is IPhoenixChannelCallback suitable for this?!
+     */
+    private Map<String, PhxCallback> receiveHooks = new HashMap<String, PhxCallback>();
+
+    public Channel(final String topic, final Message message, final PhxSocket socket) {
         this.topic = topic;
         this.message = message;
         this.socket = socket;
@@ -33,7 +36,7 @@ public class Channel {
         return topic;
     }
 
-    public PhoenixSocket getSocket() {
+    public PhxSocket getSocket() {
         return socket;
     }
 
@@ -41,7 +44,7 @@ public class Channel {
         this.bindings.clear();
     }
 
-    public void on(final String event, final IPhoenixChannelCallback callback) {
+    public void on(final String event, final PhxCallback callback) {
         this.bindings.add(new Binding(event, callback));
     }
 
@@ -58,15 +61,15 @@ public class Channel {
         for(final Iterator<Binding> bindingIter = bindings.iterator(); bindingIter.hasNext();) {
             final Binding binding = bindingIter.next();
             if(binding.getEvent().equals(triggerEvent)) {
-                binding.getCallback().handleMessage(message);
+                binding.getCallback().onMessage(message);
                 break;
             }
         }
     }
 
     public void send(final String event, final Message message) throws IOException {
-        final Payload payload = new Payload(this.topic, event, message, socket.getRef());
-        socket.send(payload);
+        final Envelope envelope = new Envelope(this.topic, event, message, socket.makeRef());
+        socket.send(envelope);
     }
 
     public boolean isMember(final String topic) {

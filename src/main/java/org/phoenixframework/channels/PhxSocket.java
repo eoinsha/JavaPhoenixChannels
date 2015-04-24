@@ -17,8 +17,8 @@ import java.util.logging.Logger;
 import javax.websocket.*;
 
 @ClientEndpoint
-public class PhoenixSocket {
-    private static final Logger LOG = Logger.getLogger(PhoenixSocket.class.getName());
+public class PhxSocket {
+    private static final Logger LOG = Logger.getLogger(PhxSocket.class.getName());
 
     public static final int MAX_RESEND_MESSAGES = 50;
 
@@ -45,11 +45,11 @@ public class PhoenixSocket {
     private Timer reconnectTimer = null;
     private TimerTask reconnectTimerTask = null;
 
-    private LinkedBlockingQueue<Payload> resendQueue = new LinkedBlockingQueue<Payload>(MAX_RESEND_MESSAGES);
+    private LinkedBlockingQueue<Envelope> resendQueue = new LinkedBlockingQueue<Envelope>(MAX_RESEND_MESSAGES);
 
     private int refNo = 1;
 
-    public PhoenixSocket(final String endpointUri) throws IOException, DeploymentException {
+    public PhxSocket(final String endpointUri) throws IOException, DeploymentException {
         LOG.log(Level.FINE, "PhoenixSocket({0})", endpointUri);
         this.endpointUri = endpointUri;
         this.reconnectTimer = new Timer("Reconnect Timer for " + endpointUri);
@@ -83,13 +83,13 @@ public class PhoenixSocket {
         LOG.log(Level.FINE, "rejoin: {0}", channel);
         channel.reset();
         final Message joinMessage = new Message(null);
-        final Payload payload = new Payload(channel.getTopic(), ChannelEvent.JOIN.getPhxEvent(), joinMessage, getRef());
-        send(payload);
+        final Envelope envelope = new Envelope(channel.getTopic(), ChannelEvent.JOIN.getPhxEvent(), joinMessage, makeRef());
+        send(envelope);
     }
 
     public void join(final String topic, final Message message) throws IOException {
-        LOG.log(Level.FINE, "join: {0}, {1}", new Object[]{ topic, message });
-        final Channel channel = new Channel(topic, message, PhoenixSocket.this);
+        LOG.log(Level.FINE, "join: {0}, {1}", new Object[]{topic, message});
+        final Channel channel = new Channel(topic, message, PhxSocket.this);
         channels.add(channel);
         if(isConnected()) {
             rejoin(channel);
@@ -99,8 +99,8 @@ public class PhoenixSocket {
     public void leave(final String topic) throws IOException {
         LOG.log(Level.FINE, "leave: {0}", topic);
         final Message leavingMessage = new Message(null);
-        final Payload payload = new Payload(topic, ChannelEvent.LEAVE.getPhxEvent(), leavingMessage, getRef());
-        send(payload);
+        final Envelope envelope = new Envelope(topic, ChannelEvent.LEAVE.getPhxEvent(), leavingMessage, makeRef());
+        send(envelope);
         for(final Iterator<Channel> channelIter = channels.iterator(); channelIter.hasNext(); channelIter.next()) {
             if(channelIter.next().isMember(topic)) {
                 channelIter.remove();
@@ -111,26 +111,26 @@ public class PhoenixSocket {
     /**
      * TODO - Propagate exception differently
      *
-     * @param payload
+     * @param envelope
      * @throws IOException
      */
-    public void send(final Payload payload) throws IOException {
-        LOG.log(Level.FINE, "Sending payload: {0}", payload);
+    public void send(final Envelope envelope) throws IOException {
+        LOG.log(Level.FINE, "Sending envelope: {0}", envelope);
         final ObjectNode node = objectMapper.createObjectNode();
-        node.put("topic", payload.getTopic());
-        node.put("event", payload.getEvent());
-        node.put("ref", getRef());
+        node.put("topic", envelope.getTopic());
+        node.put("event", envelope.getEvent());
+        node.put("ref", makeRef());
 
-        if(payload.getMessage() != null) {
+        if(envelope.getMessage() != null) {
             // TODO - Check if null check is sufficient
-            node.putPOJO("payload",payload.getMessage());
+            node.putPOJO("envelope", envelope.getMessage());
         }
         final String json = objectMapper.writeValueAsString(node);
         LOG.log(Level.FINE, "Sending JSON: {0}", json);
         wsSession.getAsyncRemote().sendText(json);
     }
 
-    synchronized String getRef() {
+    synchronized String makeRef() {
         int val = refNo++;
         if(refNo == Integer.MAX_VALUE) {
             refNo = 0;
@@ -138,8 +138,8 @@ public class PhoenixSocket {
         return Integer.toString(val);
     }
 
-    public static String replyEventName(final int refNo) {
-        return "chan_reply_" + refNo;
+    public static String replyEventName(final String ref) {
+        return "chan_reply_" + ref;
     }
 
     @OnOpen
@@ -171,7 +171,7 @@ public class PhoenixSocket {
             public void run() {
                 LOG.log(Level.FINE, "reconnectTimerTask run");
                 try {
-                    PhoenixSocket.this.connect();
+                    PhxSocket.this.connect();
                 } catch (IOException e) {
                     e.printStackTrace();
                     // TODO - log error, callback
@@ -186,12 +186,12 @@ public class PhoenixSocket {
 
     @OnMessage
     public void onTextMessage(final String payloadText) {
-        LOG.log(Level.FINE, "Payload received: {0}", payloadText);
+        LOG.log(Level.FINE, "Envelope received: {0}", payloadText);
         try {
-            final Payload payload = objectMapper.readValue(payloadText, Payload.class);
+            final Envelope envelope = objectMapper.readValue(payloadText, Envelope.class);
             for(final Channel channel : channels) {
-                if(channel.isMember(payload.getTopic())) {
-                    channel.trigger(payload.getEvent(), payload.getMessage());
+                if(channel.isMember(envelope.getTopic())) {
+                    channel.trigger(envelope.getEvent(), envelope.getMessage());
                 }
             }
         } catch (IOException e) {
