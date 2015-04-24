@@ -50,7 +50,7 @@ public class PhoenixSocket {
     private int refNo = 1;
 
     public PhoenixSocket(final String endpointUri) throws IOException, DeploymentException {
-        LOG.log(Level.FINE, "PhoenixSocket", endpointUri);
+        LOG.log(Level.FINE, "PhoenixSocket({0})", endpointUri);
         this.endpointUri = endpointUri;
         this.reconnectTimer = new Timer("Reconnect Timer for " + endpointUri);
     }
@@ -80,15 +80,15 @@ public class PhoenixSocket {
     }
 
     public void rejoin(final Channel channel) throws IOException {
-        LOG.log(Level.FINE, "rejoin", channel);
+        LOG.log(Level.FINE, "rejoin: {0}", channel);
         channel.reset();
-        final Message joinMessage = new Message("status", "joining");
-        final Payload payload = new Payload(channel.getTopic(), "join", joinMessage);
+        final Message joinMessage = new Message(null);
+        final Payload payload = new Payload(channel.getTopic(), ChannelEvent.JOIN.getPhxEvent(), joinMessage, getRef());
         send(payload);
     }
 
     public void join(final String topic, final Message message) throws IOException {
-        LOG.log(Level.FINE, "join", new Object[]{ topic, message });
+        LOG.log(Level.FINE, "join: {0}, {1}", new Object[]{ topic, message });
         final Channel channel = new Channel(topic, message, PhoenixSocket.this);
         channels.add(channel);
         if(isConnected()) {
@@ -97,9 +97,9 @@ public class PhoenixSocket {
     }
 
     public void leave(final String topic) throws IOException {
-        LOG.log(Level.FINE, "leave", topic);
-        final Message leavingMessage = new Message("status", "leaving");
-        final Payload payload = new Payload(topic, "leave", leavingMessage);
+        LOG.log(Level.FINE, "leave: {0}", topic);
+        final Message leavingMessage = new Message(null);
+        final Payload payload = new Payload(topic, ChannelEvent.LEAVE.getPhxEvent(), leavingMessage, getRef());
         send(payload);
         for(final Iterator<Channel> channelIter = channels.iterator(); channelIter.hasNext(); channelIter.next()) {
             if(channelIter.next().isMember(topic)) {
@@ -115,25 +115,27 @@ public class PhoenixSocket {
      * @throws IOException
      */
     public void send(final Payload payload) throws IOException {
-        LOG.log(Level.FINE, "Sending payload", payload);
+        LOG.log(Level.FINE, "Sending payload: {0}", payload);
         final ObjectNode node = objectMapper.createObjectNode();
         node.put("topic", payload.getTopic());
         node.put("event", payload.getEvent());
-        node.put("ref", getRefNo());
+        node.put("ref", getRef());
 
         if(payload.getMessage() != null) {
             // TODO - Check if null check is sufficient
-            node.putPOJO("message",payload.getMessage());
+            node.putPOJO("payload",payload.getMessage());
         }
-        wsSession.getAsyncRemote().sendText(objectMapper.writeValueAsString(node));
+        final String json = objectMapper.writeValueAsString(node);
+        LOG.log(Level.FINE, "Sending JSON: {0}", json);
+        wsSession.getAsyncRemote().sendText(json);
     }
 
-    private synchronized int getRefNo() {
+    synchronized String getRef() {
         int val = refNo++;
         if(refNo == Integer.MAX_VALUE) {
             refNo = 0;
         }
-        return val;
+        return Integer.toString(val);
     }
 
     public static String replyEventName(final int refNo) {
@@ -142,7 +144,7 @@ public class PhoenixSocket {
 
     @OnOpen
     public void onOpen(final Session session) {
-        LOG.log(Level.FINE, "WebSocket onOpen", session);
+        LOG.log(Level.FINE, "WebSocket onOpen: {0}", session);
         this.wsSession = session;
         if(this.reconnectTimerTask != null) {
             this.reconnectTimerTask.cancel();
@@ -158,9 +160,11 @@ public class PhoenixSocket {
 
     @OnClose
     public void onClose(final Session session, final CloseReason reason) {
-        LOG.log(Level.FINE, "WebSocket onClose", new Object[]{session, reason});
+        LOG.log(Level.FINE, "WebSocket onClose {0}, {1}", new Object[]{session, reason});
         this.wsSession = null;
-        this.reconnectTimerTask.cancel();
+        if(this.reconnectTimerTask != null) {
+            this.reconnectTimerTask.cancel();
+        }
 
         this.reconnectTimerTask = new TimerTask() {
             @Override
@@ -182,7 +186,7 @@ public class PhoenixSocket {
 
     @OnMessage
     public void onTextMessage(final String payloadText) {
-        LOG.log(Level.FINE, "Payload received", payloadText);
+        LOG.log(Level.FINE, "Payload received: {0}", payloadText);
         try {
             final Payload payload = objectMapper.readValue(payloadText, Payload.class);
             for(final Channel channel : channels) {

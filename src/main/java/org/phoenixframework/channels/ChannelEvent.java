@@ -7,7 +7,7 @@ public enum ChannelEvent {
     REPLY("phx_reply"),
     LEAVE("phx_leave");
 
-    final String phxEvent;
+    private final String phxEvent;
 
     private ChannelEvent(final String phxEvent) {
         this.phxEvent = phxEvent;

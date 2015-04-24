@@ -14,7 +14,6 @@ public class Channel {
         return "Channel{" +
                 "topic='" + topic + '\'' +
                 ", message=" + message +
-                ", socket=" + socket +
                 ", bindings=" + bindings +
                 '}';
     }
@@ -66,7 +65,7 @@ public class Channel {
     }
 
     public void send(final String event, final Message message) throws IOException {
-        final Payload payload = new Payload(this.topic, event, message);
+        final Payload payload = new Payload(this.topic, event, message, socket.getRef());
         socket.send(payload);
     }
 
