@@ -1,9 +1,19 @@
 apply plugin: 'java'
 apply plugin: 'maven'
+apply plugin: 'groovy'
 
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
     compile 'org.codehaus.jackson:jackson-mapper-asl:1.8.5'
+    compile 'org.glassfish.tyrus.bundles:tyrus-standalone-client:1.10'
+    compile 'org.codehaus.groovy:groovy-all:2.3.6'
+}
+
+task runGroovyTest (dependsOn: 'classes', type: JavaExec) {
+    main = 'SimpleCliTest'
+    classpath = sourceSets.main.runtimeClasspath
+    systemProperty 'java.util.logging.config.file', 'C:\\dev\\JavaPhoenixChannels\\src\\main\\resources\\logging.properties'
+//    jvmArgs '-verbose:class'
 }
 
 repositories {
@@ -13,4 +23,3 @@ repositories {
 group = 'org.phoenixframework.channels'
 version = '0.1.0-SNAPSHOT'
 sourceCompatibility = '1.7.0'
-

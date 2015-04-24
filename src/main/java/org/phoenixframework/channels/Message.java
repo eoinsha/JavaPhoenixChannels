@@ -4,6 +4,14 @@ public class Message {
     private String subject;
     private String body;
 
+    @Override
+    public String toString() {
+        return "Message{" +
+                "subject='" + subject + '\'' +
+                ", body='" + body + '\'' +
+                '}';
+    }
+
     public Message(final String subject, final String body) {
         this.subject = subject;
         this.body = body;

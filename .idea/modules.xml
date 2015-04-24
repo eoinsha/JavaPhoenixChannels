@@ -2,10 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/AndroidPhoenixChannels.iml" filepath="$PROJECT_DIR$/AndroidPhoenixChannels.iml" />
-      <module fileurl="file://$PROJECT_DIR$/Phoenix/Phoenix.iml" filepath="$PROJECT_DIR$/Phoenix/Phoenix.iml" />
-      <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
+      <module fileurl="file://$PROJECT_DIR$/JavaPhoenixChannels.iml" filepath="$PROJECT_DIR$/JavaPhoenixChannels.iml" />
     </modules>
   </component>
 </project>
-

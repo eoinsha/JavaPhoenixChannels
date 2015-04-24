@@ -4,30 +4,37 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.logging.Logger;
 
 public class Channel {
-    private String channel;
+    private static final Logger LOG = Logger.getLogger(Channel.class.getName());
+
+    @Override
+    public String toString() {
+        return "Channel{" +
+                "topic='" + topic + '\'' +
+                ", message=" + message +
+                ", socket=" + socket +
+                ", bindings=" + bindings +
+                '}';
+    }
+
     private String topic;
     private Message message;
-    private Socket socket;
+    private PhoenixSocket socket;
     private List<Binding> bindings = new ArrayList<Binding>();
 
-    public Channel(final String channel, final String topic, final Message message, final Socket socket) {
-        this.channel = channel;
+    public Channel(final String topic, final Message message, final PhoenixSocket socket) {
         this.topic = topic;
         this.message = message;
         this.socket = socket;
-    }
-
-    public String getChannel() {
-        return channel;
     }
 
     public String getTopic() {
         return topic;
     }
 
-    public Socket getSocket() {
+    public PhoenixSocket getSocket() {
         return socket;
     }
 
@@ -59,17 +66,17 @@ public class Channel {
     }
 
     public void send(final String event, final Message message) throws IOException {
-        final Payload payload = new Payload(this.channel, this.topic, event, message);
+        final Payload payload = new Payload(this.topic, event, message);
         socket.send(payload);
     }
 
-    public boolean isMember(final String channel, final String topic) {
-        return this.channel == channel && this.topic == topic;
+    public boolean isMember(final String topic) {
+        return this.topic == topic;
     }
 
     public void leave() throws IOException {
         if(socket != null) {
-            socket.leave(this.channel, this.topic);
+            socket.leave(this.topic);
         }
     }
 }

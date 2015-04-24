@@ -7,22 +7,29 @@ import org.codehaus.jackson.map.SerializerProvider;
 import org.codehaus.jackson.map.TypeSerializer;
 
 import java.io.IOException;
+import java.util.logging.Logger;
 
 public class Payload {
-    private String channel;
+    private static final Logger LOG = Logger.getLogger(PhoenixSocket.class.getName());
+
     private String topic;
+
+    @Override
+    public String toString() {
+        return "Payload{" +
+                "topic='" + topic + '\'' +
+                ", event='" + event + '\'' +
+                ", message=" + message +
+                '}';
+    }
+
     private String event;
     private Message message;
 
-    public Payload(final String channel, final String topic, final String event, final Message message) {
-        this.channel = channel;
+    public Payload(final String topic, final String event, final Message message) {
         this.topic = topic;
         this.event = event;
         this.message = message;
-    }
-
-    public String getChannel() {
-        return channel;
     }
 
     public String getTopic() {
