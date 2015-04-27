@@ -40,6 +40,10 @@ public class Envelope {
         return message;
     }
 
+    public String getRef() {
+        return ref;
+    }
+
     @Override
     public String toString() {
         return "Envelope{" +

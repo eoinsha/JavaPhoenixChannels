@@ -5,11 +5,7 @@ import org.codehaus.jackson.node.ObjectNode;
 
 import java.io.IOException;
 import java.net.URI;
-import java.util.Iterator;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.*;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -46,6 +42,13 @@ public class PhxSocket {
     private TimerTask reconnectTimerTask = null;
 
     private LinkedBlockingQueue<Envelope> resendQueue = new LinkedBlockingQueue<Envelope>(MAX_RESEND_MESSAGES);
+
+    private Map<SocketEvent, List<PhxCallback>> socketEventCallbacks = new HashMap<SocketEvent, List<PhxCallback>>();
+    {
+        for(SocketEvent ev : SocketEvent.values()) {
+            socketEventCallbacks.put(ev, new ArrayList<PhxCallback>());
+        }
+    }
 
     private int refNo = 1;
 
@@ -87,9 +90,9 @@ public class PhxSocket {
         send(envelope);
     }
 
-    public void join(final String topic, final Message message) throws IOException {
+    public void join(final String topic, final Message message, final PhxCallback callback) throws IOException {
         LOG.log(Level.FINE, "join: {0}, {1}", new Object[]{topic, message});
-        final Channel channel = new Channel(topic, message, PhxSocket.this);
+        final Channel channel = new Channel(topic, message, callback, PhxSocket.this);
         channels.add(channel);
         if(isConnected()) {
             rejoin(channel);
@@ -142,8 +145,45 @@ public class PhxSocket {
         return "chan_reply_" + ref;
     }
 
+    /**
+     * Register a callback for SocketEvent.OPEN events
+     *
+     * @param callback
+     */
+    public void onOpen(final PhxCallback callback ) {
+        this.socketEventCallbacks.get(SocketEvent.OPEN).add(callback);
+    }
+
+    /**
+     * Register a callback for SocketEvent.ERROR events
+     *
+     * @param callback
+     */
+    public void onClose(final PhxCallback callback ) {
+        this.socketEventCallbacks.get(SocketEvent.CLOSE).add(callback);
+
+    }
+
+    /**
+     * Register a callback for SocketEvent.ERROR events
+     *
+     * @param callback
+     */
+    public void onError(final PhxCallback callback ) {
+        this.socketEventCallbacks.get(SocketEvent.ERROR).add(callback);
+    }
+
+    /**
+     * Register a callback for SocketEvent.MESSAGE events
+     *
+     * @param callback
+     */
+    public void onMessage(final PhxCallback callback ) {
+        this.socketEventCallbacks.get(SocketEvent.MESSAGE).add(callback);
+    }
+
     @OnOpen
-    public void onOpen(final Session session) {
+    public void onConnOpen(final Session session) {
         LOG.log(Level.FINE, "WebSocket onOpen: {0}", session);
         this.wsSession = session;
         if(this.reconnectTimerTask != null) {
@@ -152,6 +192,9 @@ public class PhxSocket {
 
         try {
             rejoinAll();
+            for(final PhxCallback callback : socketEventCallbacks.get(SocketEvent.OPEN)) {
+                callback.onOpen();
+            }
         } catch (IOException e) {
             // TODO - logger, error callback
             e.printStackTrace();
@@ -159,7 +202,7 @@ public class PhxSocket {
     }
 
     @OnClose
-    public void onClose(final Session session, final CloseReason reason) {
+    public void onConnClose(final Session session, final CloseReason reason) {
         LOG.log(Level.FINE, "WebSocket onClose {0}, {1}", new Object[]{session, reason});
         this.wsSession = null;
         if(this.reconnectTimerTask != null) {
@@ -180,12 +223,15 @@ public class PhxSocket {
                 }
             }
         };
-
         reconnectTimer.schedule(this.reconnectTimerTask, RECONNECT_INTERVAL_MS, RECONNECT_INTERVAL_MS);
+
+        for(final PhxCallback callback : socketEventCallbacks.get(SocketEvent.CLOSE)) {
+            callback.onClose();
+        }
     }
 
     @OnMessage
-    public void onTextMessage(final String payloadText) {
+    public void onConnTextMessage(final String payloadText) {
         LOG.log(Level.FINE, "Envelope received: {0}", payloadText);
         try {
             final Envelope envelope = objectMapper.readValue(payloadText, Envelope.class);
@@ -194,9 +240,21 @@ public class PhxSocket {
                     channel.trigger(envelope.getEvent(), envelope.getMessage());
                 }
             }
+
+            for(final PhxCallback callback : socketEventCallbacks.get(SocketEvent.MESSAGE)) {
+                callback.onMessage(envelope);
+            }
         } catch (IOException e) {
             // TODO: log, signal
             e.printStackTrace();
+        }
+    }
+
+    @OnError
+    public void onConnError(final Throwable error) {
+        LOG.log(Level.WARNING, "WebSocket connection error", error);
+        for(final PhxCallback callback : socketEventCallbacks.get(SocketEvent.CLOSE)) {
+            callback.onError(error.toString()/* TODO - Throwable? */);
         }
     }
 }
