@@ -1,10 +1,12 @@
 package org.phoenixframework.channels;
 
-public class Binding {
-    final String event;
-    final PhxCallback callback;
+import org.phoenixframework.channels.PhxCallback;
 
-    public Binding(final String event, final PhxCallback callback) {
+class Binding {
+    final String event;
+    final ChannelCallback callback;
+
+    public Binding(final String event, final ChannelCallback callback) {
         this.event = event;
         this.callback = callback;
     }
@@ -13,7 +15,7 @@ public class Binding {
         return event;
     }
 
-    public PhxCallback getCallback() {
+    public ChannelCallback getCallback() {
         return callback;
     }
 }

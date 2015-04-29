@@ -11,20 +11,20 @@ class Push {
 
     private Channel channel = null;
     private String event = null;
-    private Message message = null;
+    private Payload payload = null;
     private Envelope receivedEnvelope = null;
 //  TODO  private List afterHooks = null;
-    private Map<String, PhxCallback> recHooks = new HashMap<String, PhxCallback>();
+    private Map<String, ChannelCallback> recHooks = new HashMap<String, ChannelCallback>();
     private boolean sent = false;
 
-    Push(final Channel channel, final String event, final Message message) {
-        this(channel, event, message, null);
+    Push(final Channel channel, final String event, final Payload payload) {
+        this(channel, event, payload, null);
     }
 
-    Push(final Channel channel, final String event, final Message message, final Push mergePush) {
+    Push(final Channel channel, final String event, final Payload payload, final Push mergePush) {
         this.channel = channel;
         this.event = event;
-        this.message = message;
+        this.payload = payload;
         if(mergePush != null) {
             // TODO - Merge afterHooks ?
             this.recHooks.putAll(mergePush.getRecHooks());
@@ -33,15 +33,15 @@ class Push {
 
     void send() throws IOException {
         final String ref = channel.getSocket().makeRef();
-        final String refEvent = PhxSocket.replyEventName(ref);
+        final String refEvent = Socket.replyEventName(ref);
 
         LOG.log(Level.FINE, "Push send, ref={0}", ref);
 
-        this.channel.on(refEvent, new PhxCallback() {
+        this.channel.on(refEvent, new ChannelCallback() {
             @Override
             public void onMessage(final Envelope envelope) {
                 Push.this.receivedEnvelope = envelope;
-                Push.this.matchReceive(receivedEnvelope.getMessage().getResponseStatus(), envelope, ref);
+                Push.this.matchReceive(((Payload)receivedEnvelope.getPayload()).getResponseStatus(), envelope, ref);
                 Push.this.channel.off(refEvent);
                 // TODO Push.this.cancelAfters();
             }
@@ -49,7 +49,7 @@ class Push {
 
         // TODO this.startAfters();
         this.sent = true;
-        final Envelope envelope = new Envelope(this.channel.getTopic(), this.event, this.message, ref);
+        final Envelope envelope = new Envelope(this.channel.getTopic(), this.event, this.payload, ref);
         this.channel.getSocket().send(envelope);
     }
 
@@ -59,9 +59,9 @@ class Push {
      *
      * @return This instance's self
      */
-    Push receive(final String status, final PhxCallback callback) {
+    Push receive(final String status, final ChannelCallback callback) {
         if(this.receivedEnvelope != null) {
-            final String receivedStatus = this.receivedEnvelope.getMessage().getResponseStatus();
+            final String receivedStatus = this.receivedEnvelope.getPayload().getResponseStatus();
             if(receivedStatus != null && receivedStatus.equals(status)) {
                 callback.onMessage(this.receivedEnvelope); // TODO - What is best to provide here. Polymorphic messages.
             }
@@ -71,7 +71,7 @@ class Push {
     }
 
     private void matchReceive(final String status, final Envelope envelope, final String ref) {
-        final PhxCallback callback = this.recHooks.get(status);
+        final ChannelCallback callback = this.recHooks.get(status);
         if(callback != null) {
             if(this.event.equals(ChannelEvent.JOIN.getPhxEvent())) {
                 callback.onChannel(this.channel);
@@ -90,15 +90,15 @@ class Push {
         return event;
     }
 
-    Message getMessage() {
-        return message;
+    Payload getPayload() {
+        return payload;
     }
 
     Envelope getReceivedEnvelope() {
         return receivedEnvelope;
     }
 
-    Map<String, PhxCallback> getRecHooks() {
+    Map<String, ChannelCallback> getRecHooks() {
         return recHooks;
     }
 

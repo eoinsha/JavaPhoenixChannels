@@ -1,13 +1,16 @@
 package org.phoenixframework.channels;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 public abstract class PhxCallback {
-    public void onMessage(Envelope message) {}
+    private static final Logger LOG = Logger.getLogger(PhxCallback.class.getName());
 
-    public void onChannel(Channel channel) {}
+    public void onError(final String reason) {LOG.log(Level.SEVERE, "onError: {0}", reason);}
 
-    public void onError(String reason) {}
-
-    public void onOpen() {}
-
-    public void onClose() {}
+    /**
+     * TODO - Seems like this need only be in ChannelCallback
+     * @param envelope
+     */
+    public void onMessage(final Envelope envelope) {LOG.log(Level.FINE, "onMessage: {0}", envelope);}
 }
