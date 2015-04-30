@@ -18,7 +18,7 @@ public class Socket {
 
     public static final int MAX_RESEND_MESSAGES = 50;
 
-    private static final int RECONNECT_INTERVAL_MS = 5000;
+    public static final int RECONNECT_INTERVAL_MS = 5000;
 
     @Override
     public String toString() {

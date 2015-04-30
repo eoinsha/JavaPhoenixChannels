@@ -5,7 +5,7 @@ import java.util.*;
 import java.util.logging.Logger;
 
 /**
- * // TODO - Figure out the reason for after(ms, callback) in phoenix.js
+ * // TODO - Figure out the reason for after(ms, callback) in phoenix.js - ask @chrismccord
  */
 public class Channel {
     private static final Logger LOG = Logger.getLogger(Channel.class.getName());
@@ -21,12 +21,17 @@ public class Channel {
 
     private Map<String, PhxCallback> receiveHooks = new HashMap<String, PhxCallback>();
 
+    private Timer rejoinTimer = null;
+    private TimerTask rejoinTimerTask = null;
+
     public Channel(final String topic, final Payload payload, final ChannelCallback callback, final Socket socket) {
         this.topic = topic;
         this.payload = payload;
         this.callback = callback;
         this.socket = socket;
         this.joinPush = new Push(this, ChannelEvent.JOIN.getPhxEvent(), payload);
+        this.rejoinTimer = new Timer("Rejoin timer for " + topic);
+
     }
 
     /**
@@ -110,11 +115,29 @@ public class Channel {
     public Channel reset() {
         this.bindings.clear();
         final Push newJoinPush = new Push(this, ChannelEvent.JOIN.getPhxEvent(), this.payload, this.joinPush);
-        // this.onError Don't understand the need for rejoin on error in phoenix.js TODO
+        this.onError(new ChannelCallback(){
+            /* TODO - @chrismccord Figure out potentital contention betweeen this timer and the Socket reconenct timer */
+            @Override
+            public void onError(String reason) {
+                super.onError(reason);
+                Channel.this.rejoinTimerTask = new TimerTask() {
+                    @Override
+                    public void run() {
+                        try {
+                            Channel.this.rejoin();
+                        } catch (IOException e) {
+                            e.printStackTrace();
+                            /* TODO Log and/or signal upstream */
+                        }
+                    }
+                };
+                Channel.this.rejoinTimer.schedule(Channel.this.rejoinTimerTask, Socket.RECONNECT_INTERVAL_MS, Socket.RECONNECT_INTERVAL_MS);
+            }
+        });
         this.on(ChannelEvent.REPLY.getPhxEvent(), new ChannelCallback() {
             @Override
             public void onMessage(final String event, final String topic, final Payload payload) {
-                // TODO What's the actual point of replyEventName
+                // TODO @chrismccord What's the actual point of replyEventName
                 Channel.this.trigger(
                         /* Socket.replyEventName(envelope.getRef())*/
                         event /*?*/, payload);
@@ -144,9 +167,9 @@ public class Channel {
             @Override
             public void onMessage(final String topic, final String event, final Payload payload) {
                 try {
-                    Channel.this.getSocket().leave(/*TODO*/topic);
+                    Channel.this.getSocket().leave(topic);
                 } catch (IOException e) {
-                    /* TODO */
+                    /* TODO Log and/or signal upstream */
                     e.printStackTrace();
                 }
             }
@@ -154,7 +177,7 @@ public class Channel {
     }
 
     public boolean isMember(final String topic) {
-        return this.topic == topic;
+        return this.topic.equals(topic);
     }
 
     public String getTopic() {

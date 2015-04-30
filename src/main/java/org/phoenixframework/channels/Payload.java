@@ -27,7 +27,7 @@ public class Payload {
     public String toString() {
         final StringBuilder builder = new StringBuilder("Payload{");
         for(final Map.Entry<String, Object> field : fields.entrySet()) {
-            builder.append(field.getKey()).append(':').append(field.getValue());
+            builder.append(field.getKey()).append(':').append(field.getValue()).append(", ");
         }
         return builder.append('}').toString();
     }
@@ -60,7 +60,6 @@ public class Payload {
         if(status != null && status instanceof String) {
            return status.toString();
         }
-        LOG.log(Level.WARNING, "Unexpected or missing status found in payload of message {0}", this);
         return null;
     }
 
