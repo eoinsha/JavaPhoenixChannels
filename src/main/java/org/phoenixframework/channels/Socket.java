@@ -12,7 +12,6 @@ import java.util.logging.Logger;
 
 import javax.websocket.*;
 
-@ClientEndpoint
 public class Socket {
     private static final Logger LOG = Logger.getLogger(Socket.class.getName());
 
@@ -52,6 +51,89 @@ public class Socket {
 
     private int refNo = 1;
 
+    /**
+     * Annotated WS Endpoint. Private member to prevent confusion with "onConn*" registration methods.
+     */
+    private PhoenixWSEndpoint wsEndpoint = new PhoenixWSEndpoint();
+
+    @ClientEndpoint
+    public class PhoenixWSEndpoint{
+        private PhoenixWSEndpoint(){}
+
+        @OnOpen
+        public void onConnOpen(final Session session) {
+            LOG.log(Level.FINE, "WebSocket onOpen: {0}", session);
+            Socket.this.wsSession = session;
+            if(Socket.this.reconnectTimerTask != null) {
+                Socket.this.reconnectTimerTask.cancel();
+            }
+
+            try {
+                rejoinAll();
+                for(final SocketCallback callback : socketEventCallbacks.get(SocketEvent.OPEN)) {
+                    callback.onOpen();
+                }
+            } catch (IOException e) {
+                // TODO - logger, error callback
+                e.printStackTrace();
+            }
+        }
+
+        @OnClose
+        public void onConnClose(final Session session, final CloseReason reason) {
+            LOG.log(Level.FINE, "WebSocket onClose {0}, {1}", new Object[]{session, reason});
+            Socket.this.wsSession = null;
+            if(Socket.this.reconnectTimerTask != null) {
+                Socket.this.reconnectTimerTask.cancel();
+            }
+
+            Socket.this.reconnectTimerTask = new TimerTask() {
+                @Override
+                public void run() {
+                    LOG.log(Level.FINE, "reconnectTimerTask run");
+                    try {
+                        Socket.this.connect();
+                    } catch (Exception e) {
+                        LOG.log(Level.SEVERE, "Failed to reconnect to " + Socket.this.wsEndpoint, e);
+                    }
+                }
+            };
+            reconnectTimer.schedule(Socket.this.reconnectTimerTask, RECONNECT_INTERVAL_MS, RECONNECT_INTERVAL_MS);
+
+            for(final SocketCallback callback : socketEventCallbacks.get(SocketEvent.CLOSE)) {
+                callback.onClose();
+            }
+        }
+
+        @OnMessage
+        public void onConnTextMessage(final String payloadText) {
+            LOG.log(Level.FINE, "Envelope received: {0}", payloadText);
+            try {
+                final Envelope envelope = objectMapper.readValue(payloadText, Envelope.class);
+                for(final Channel channel : channels) {
+                    if(channel.isMember(envelope.getTopic())) {
+                        channel.trigger(envelope.getEvent(), envelope.getPayload());
+                    }
+                }
+
+                for(final SocketCallback callback : socketEventCallbacks.get(SocketEvent.MESSAGE)) {
+                    callback.onMessage(envelope);
+                }
+            } catch (IOException e) {
+                // TODO: log, signal
+                e.printStackTrace();
+            }
+        }
+
+        @OnError
+        public void onConnError(final Throwable error) {
+            LOG.log(Level.WARNING, "WebSocket connection error", error);
+            for(final PhxCallback callback : socketEventCallbacks.get(SocketEvent.CLOSE)) {
+                callback.onError(error.toString()/* TODO - Throwable? */);
+            }
+        }
+    };
+
     public Socket(final String endpointUri) throws IOException, DeploymentException {
         LOG.log(Level.FINE, "PhoenixSocket({0})", endpointUri);
         this.endpointUri = endpointUri;
@@ -68,7 +150,7 @@ public class Socket {
     public void connect() throws IOException, DeploymentException {
         LOG.log(Level.FINE, "connect");
         disconnect();
-        wsContainer.connectToServer(this, URI.create(this.endpointUri));
+        wsContainer.connectToServer(wsEndpoint, URI.create(this.endpointUri));
     }
 
     public boolean isConnected() {
@@ -95,7 +177,7 @@ public class Socket {
     }
 
     /**
-     * Join withoout a channel callback
+     * Join without a channel callback
      *
      * @param topic
      * @param payload
@@ -115,7 +197,7 @@ public class Socket {
         return join(topic, null, null);
     }
 
-    public void leave(final String topic) throws IOException {
+    public Socket leave(final String topic) throws IOException {
         LOG.log(Level.FINE, "leave: {0}", topic);
         final Payload leavingPayload = new Payload(null);
         final Envelope envelope = new Envelope(topic, ChannelEvent.LEAVE.getPhxEvent(), leavingPayload, makeRef());
@@ -125,13 +207,15 @@ public class Socket {
                 channelIter.remove();
             }
         }
+        return this;
     }
 
-    public void rejoinAll() throws IOException {
+    public Socket rejoinAll() throws IOException {
         LOG.log(Level.FINE, "rejoinAll");
         for(final Channel channel: channels) {
             rejoin(channel);
         }
+        return this;
     }
 
     /**
@@ -140,7 +224,7 @@ public class Socket {
      * @param envelope
      * @throws IOException
      */
-    public void send(final Envelope envelope) throws IOException {
+    public Socket send(final Envelope envelope) throws IOException {
         LOG.log(Level.FINE, "Sending envelope: {0}", envelope);
         final ObjectNode node = objectMapper.createObjectNode();
         node.put("topic", envelope.getTopic());
@@ -154,6 +238,7 @@ public class Socket {
         final String json = objectMapper.writeValueAsString(node);
         LOG.log(Level.FINE, "Sending JSON: {0}", json);
         wsSession.getAsyncRemote().sendText(json);
+        return this;
     }
 
     /**
@@ -161,8 +246,9 @@ public class Socket {
      *
      * @param callback
      */
-    public void onOpen(final SocketCallback callback ) {
+    public Socket onOpen(final SocketCallback callback ) {
         this.socketEventCallbacks.get(SocketEvent.OPEN).add(callback);
+        return this;
     }
 
     /**
@@ -170,9 +256,9 @@ public class Socket {
      *
      * @param callback
      */
-    public void onClose(final SocketCallback callback ) {
+    public Socket onClose(final SocketCallback callback ) {
         this.socketEventCallbacks.get(SocketEvent.CLOSE).add(callback);
-
+        return this;
     }
 
     /**
@@ -180,8 +266,9 @@ public class Socket {
      *
      * @param callback
      */
-    public void onError(final SocketCallback callback ) {
+    public Socket onError(final SocketCallback callback ) {
         this.socketEventCallbacks.get(SocketEvent.ERROR).add(callback);
+        return this;
     }
 
     /**
@@ -189,85 +276,9 @@ public class Socket {
      *
      * @param callback
      */
-    public void onMessage(final SocketCallback callback ) {
+    public Socket onMessage(final SocketCallback callback ) {
         this.socketEventCallbacks.get(SocketEvent.MESSAGE).add(callback);
-    }
-
-
-    @OnOpen
-    public void onConnOpen(final Session session) {
-        LOG.log(Level.FINE, "WebSocket onOpen: {0}", session);
-        this.wsSession = session;
-        if(this.reconnectTimerTask != null) {
-            this.reconnectTimerTask.cancel();
-        }
-
-        try {
-            rejoinAll();
-            for(final SocketCallback callback : socketEventCallbacks.get(SocketEvent.OPEN)) {
-                callback.onOpen();
-            }
-        } catch (IOException e) {
-            // TODO - logger, error callback
-            e.printStackTrace();
-        }
-    }
-
-    @OnClose
-    public void onConnClose(final Session session, final CloseReason reason) {
-        LOG.log(Level.FINE, "WebSocket onClose {0}, {1}", new Object[]{session, reason});
-        this.wsSession = null;
-        if(this.reconnectTimerTask != null) {
-            this.reconnectTimerTask.cancel();
-        }
-
-        this.reconnectTimerTask = new TimerTask() {
-            @Override
-            public void run() {
-                LOG.log(Level.FINE, "reconnectTimerTask run");
-                try {
-                    Socket.this.connect();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    // TODO - log error, callback
-                } catch (DeploymentException e) {
-                    e.printStackTrace();
-                }
-            }
-        };
-        reconnectTimer.schedule(this.reconnectTimerTask, RECONNECT_INTERVAL_MS, RECONNECT_INTERVAL_MS);
-
-        for(final SocketCallback callback : socketEventCallbacks.get(SocketEvent.CLOSE)) {
-            callback.onClose();
-        }
-    }
-
-    @OnMessage
-    public void onConnTextMessage(final String payloadText) {
-        LOG.log(Level.FINE, "Envelope received: {0}", payloadText);
-        try {
-            final Envelope envelope = objectMapper.readValue(payloadText, Envelope.class);
-            for(final Channel channel : channels) {
-                if(channel.isMember(envelope.getTopic())) {
-                    channel.trigger(envelope.getEvent(), envelope.getPayload());
-                }
-            }
-
-            for(final SocketCallback callback : socketEventCallbacks.get(SocketEvent.MESSAGE)) {
-                callback.onMessage(envelope);
-            }
-        } catch (IOException e) {
-            // TODO: log, signal
-            e.printStackTrace();
-        }
-    }
-
-    @OnError
-    public void onConnError(final Throwable error) {
-        LOG.log(Level.WARNING, "WebSocket connection error", error);
-        for(final PhxCallback callback : socketEventCallbacks.get(SocketEvent.CLOSE)) {
-            callback.onError(error.toString()/* TODO - Throwable? */);
-        }
+        return this;
     }
 
     synchronized String makeRef() {
