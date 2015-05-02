@@ -15,11 +15,11 @@ public class Channel {
     private Payload payload;
     private ChannelCallback callback;
     private Socket socket;
-    private List<Binding> bindings = new ArrayList<Binding>();
+    private List<Binding> bindings = new ArrayList<>();
     // TODO - @chrismccord  phoenix.js has unused recHooks in class Channel
     private Push joinPush;
 
-    private Map<String, PhxCallback> receiveHooks = new HashMap<String, PhxCallback>();
+    private Map<String, PhxCallback> receiveHooks = new HashMap<>();
 
     private Timer rejoinTimer = null;
     private TimerTask rejoinTimerTask = null;
@@ -31,7 +31,6 @@ public class Channel {
         this.socket = socket;
         this.joinPush = new Push(this, ChannelEvent.JOIN.getPhxEvent(), payload);
         this.rejoinTimer = new Timer("Rejoin timer for " + topic);
-
     }
 
     /**
@@ -69,7 +68,9 @@ public class Channel {
      * @return The instance's self
      */
     public Channel on(final String event, final ChannelCallback callback) {
-        this.bindings.add(new Binding(event, callback));
+        synchronized(bindings) {
+            this.bindings.add(new Binding(event, callback));
+        }
         return this;
     }
 
@@ -78,21 +79,41 @@ public class Channel {
      * @return The instance's self
      */
     public Channel off(final String event) {
-        for(final Iterator<Binding> bindingIter = bindings.iterator(); bindingIter.hasNext();) {
-            if(bindingIter.next().getEvent().equals(event)) {
-                bindingIter.remove();
-                break;
+        synchronized(bindings) {
+            for (final Iterator<Binding> bindingIter = bindings.iterator(); bindingIter.hasNext(); ) {
+                if (bindingIter.next().getEvent().equals(event)) {
+                    bindingIter.remove();
+                    break;
+                }
             }
         }
         return this;
     }
 
     void trigger(final String triggerEvent, final Payload payload) {
-        for(final Iterator<Binding> bindingIter = bindings.iterator(); bindingIter.hasNext();) {
-            final Binding binding = bindingIter.next();
-            if(binding.getEvent().equals(triggerEvent)) {
-                binding.getCallback().onMessage(Channel.this.topic, triggerEvent, payload);
-                break;
+        synchronized(bindings) {
+            for (final Iterator<Binding> bindingIter = bindings.iterator(); bindingIter.hasNext(); ) {
+                final Binding binding = bindingIter.next();
+                if (binding.getEvent().equals(triggerEvent)) {
+                    binding.getCallback().onMessage(Channel.this.topic, triggerEvent, payload);
+                }
+            }
+        }
+    }
+
+    void trigger(final String triggerEvent, final Envelope envelope) {
+        if (ChannelEvent.valueOf(triggerEvent) != null) {
+            trigger(triggerEvent, envelope.getPayload());
+        } else {
+            synchronized(bindings) {
+                for (final Iterator<Binding> bindingIter = bindings.iterator(); bindingIter.hasNext(); ) {
+                    final Binding binding = bindingIter.next();
+                    if (binding.getEvent().equals(triggerEvent)) {
+                        // Channel Events get the full envelope
+                        binding.getCallback().onMessage(envelope);
+                    }
+                    break;
+                }
             }
         }
     }
@@ -113,7 +134,9 @@ public class Channel {
      * @return The instance's self
      */
     public Channel reset() {
-        this.bindings.clear();
+        synchronized(bindings) {
+            this.bindings.clear();
+        }
         final Push newJoinPush = new Push(this, ChannelEvent.JOIN.getPhxEvent(), this.payload, this.joinPush);
         this.onError(new ChannelCallback(){
             /* TODO - @chrismccord Figure out potentital contention betweeen this timer and the Socket reconenct timer */
@@ -136,11 +159,9 @@ public class Channel {
         });
         this.on(ChannelEvent.REPLY.getPhxEvent(), new ChannelCallback() {
             @Override
-            public void onMessage(final String event, final String topic, final Payload payload) {
+            public void onMessage(final Envelope envelope) {
                 // TODO @chrismccord What's the actual point of replyEventName
-                Channel.this.trigger(
-                        /* Socket.replyEventName(envelope.getRef())*/
-                        event /*?*/, payload);
+                Channel.this.trigger(Socket.replyEventName(envelope.getRef()), envelope);
             }
         });
         return this;

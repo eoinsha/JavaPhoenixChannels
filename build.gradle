@@ -13,6 +13,7 @@ task runGroovyTest (dependsOn: 'classes', type: JavaExec) {
     main = 'SimpleCliTest'
     classpath = sourceSets.main.runtimeClasspath
     systemProperty 'java.util.logging.config.file', 'C:\\dev\\JavaPhoenixChannels\\src\\main\\resources\\logging.properties'
+    standardInput = System.in
 //    jvmArgs '-verbose:class'
 }
 

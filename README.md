@@ -26,7 +26,7 @@ chan.on('message_feed', new ChannelCallback(){})
 
 ## Running the Sample Client
 - The following will run the Groovy test client application for Chris McCord's [Phoenix Takes Flight - Chat](https://github.com/chrismccord/phoenix_takes_flight) application
- - See [SimpleCliTest.groovy](src/main/groovy/SimpleCliTest.groovy) for the sample client source
+- See [SimpleCliTest.groovy](src/main/groovy/SimpleCliTest.groovy) for the sample client source
 ```
 gradle runGroovyTest
 ```

@@ -50,6 +50,16 @@ public class Payload {
         fields.put("body", body);
     }
 
+    public String getBody() { return (String)fields.get("body"); }
+
+    /**
+     * @param fieldName
+     * @return The value for the dynamic field in the payload
+     */
+    public Object get(final String fieldName) {
+        return fields.get(fieldName);
+    }
+
     /**
      * Helper for standard 'status' in response status.
      *
