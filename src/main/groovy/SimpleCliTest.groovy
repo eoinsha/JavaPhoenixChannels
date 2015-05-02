@@ -34,6 +34,8 @@ def quit = {System.exit(0)}
 def scanner = new Scanner(System.in)
 def input = ""
 while(input != null) {
+    input = scanner.nextLine().trim()
+    println "PUSHING $input"
     chan.push("new_msg", new Payload(input)).receive("ok", new ChannelCallback(){
         void onMessage(String topic, String event, Payload payload){
             println "ME: $payload.body"
