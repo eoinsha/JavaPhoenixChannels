@@ -112,7 +112,7 @@ public class Socket {
                 final Envelope envelope = objectMapper.readValue(payloadText, Envelope.class);
                 for(final Channel channel : channels) {
                     if(channel.isMember(envelope.getTopic())) {
-                        channel.trigger(envelope.getEvent(), envelope.getPayload());
+                        channel.trigger(envelope.getEvent(), envelope);
                     }
                 }
 
@@ -171,7 +171,7 @@ public class Socket {
         final Channel channel = new Channel(topic, payload, callback, Socket.this);
         channels.add(channel);
         if(isConnected()) {
-            rejoin(channel);
+            channel.rejoin();
         }
         return channel;
     }
@@ -199,7 +199,7 @@ public class Socket {
 
     public Socket leave(final String topic) throws IOException {
         LOG.log(Level.FINE, "leave: {0}", topic);
-        final Payload leavingPayload = new Payload(null);
+        final Payload leavingPayload = new Payload();
         final Envelope envelope = new Envelope(topic, ChannelEvent.LEAVE.getPhxEvent(), leavingPayload, makeRef());
         send(envelope);
         for(final Iterator<Channel> channelIter = channels.iterator(); channelIter.hasNext(); channelIter.next()) {
@@ -213,7 +213,7 @@ public class Socket {
     public Socket rejoinAll() throws IOException {
         LOG.log(Level.FINE, "rejoinAll");
         for(final Channel channel: channels) {
-            rejoin(channel);
+            channel.rejoin();
         }
         return this;
     }
@@ -229,12 +229,8 @@ public class Socket {
         final ObjectNode node = objectMapper.createObjectNode();
         node.put("topic", envelope.getTopic());
         node.put("event", envelope.getEvent());
-        node.put("ref", makeRef());
-
-        if(envelope.getPayload() != null) {
-            // TODO - Check if null check is sufficient
-            node.putPOJO("payload", envelope.getPayload());
-        }
+        node.put("ref", envelope.getRef());
+        node.putPOJO("payload", envelope.getPayload() == null ? new Payload() : envelope.getPayload());
         final String json = objectMapper.writeValueAsString(node);
         LOG.log(Level.FINE, "Sending JSON: {0}", json);
         wsSession.getAsyncRemote().sendText(json);
@@ -292,14 +288,4 @@ public class Socket {
     static String replyEventName(final String ref) {
         return "chan_reply_" + ref;
     }
-
-    private void rejoin(final Channel channel) throws IOException {
-        LOG.log(Level.FINE, "join: {0}", channel);
-        channel.reset();
-        final Payload joinPayload = new Payload(null);
-        final Envelope envelope = new Envelope(channel.getTopic(), ChannelEvent.JOIN.getPhxEvent(), joinPayload, makeRef());
-        send(envelope);
-    }
-
-
 }

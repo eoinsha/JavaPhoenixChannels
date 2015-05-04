@@ -16,4 +16,13 @@ public enum ChannelEvent {
     public String getPhxEvent() {
         return phxEvent;
     }
+
+    public static ChannelEvent getEvent(final String phxEvent) {
+        for(final ChannelEvent ev : values()) {
+            if(ev.getPhxEvent().equals(phxEvent)) {
+                return ev;
+            }
+        }
+        return null;
+    }
 }

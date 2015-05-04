@@ -1,5 +1,6 @@
 package org.phoenixframework.channels;
 
+import org.codehaus.jackson.annotate.JsonAnyGetter;
 import org.codehaus.jackson.annotate.JsonAnySetter;
 import org.codehaus.jackson.annotate.JsonIgnoreProperties;
 import org.codehaus.jackson.map.annotate.JsonSerialize;
@@ -32,25 +33,13 @@ public class Payload {
         return builder.append('}').toString();
     }
 
-    public Payload(final String body) {
-        setBody(body);
-    }
 
     @JsonAnySetter
-    public void setJSONAny(final String name, final Object value) {
-        LOG.log(Level.FINE, "setJSONAny({0},{1}", new Object[]{name, value.getClass()});
+    public void set(final String name, final Object value) {
+        LOG.log(Level.FINE, "set({0},{1}", new Object[]{name, value.getClass()});
         this.fields.put(name, value);
     }
 
-    /**
-     * Helper for standard 'body' used in requests (.body) and responses (.response.body)
-     * @param body The value for the 'body' property of the message payload
-     */
-    public void setBody(final String body) {
-        fields.put("body", body);
-    }
-
-    public String getBody() { return (String)fields.get("body"); }
 
     /**
      * @param fieldName
@@ -59,6 +48,10 @@ public class Payload {
     public Object get(final String fieldName) {
         return fields.get(fieldName);
     }
+
+
+    @JsonAnyGetter
+    public Map<String, Object> getAll() { return fields; }
 
     /**
      * Helper for standard 'status' in response status.

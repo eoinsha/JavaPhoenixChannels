@@ -41,7 +41,8 @@ public class Envelope {
     }
 
     public String getRef() {
-        return ref;
+        if(ref != null) return ref;
+        return payload != null ? (String)payload.get("ref") : null;
     }
 
     @Override

@@ -10,7 +10,6 @@ import java.util.logging.Logger;
 public class Channel {
     private static final Logger LOG = Logger.getLogger(Channel.class.getName());
 
-
     private String topic;
     private Payload payload;
     private ChannelCallback callback;
@@ -57,7 +56,11 @@ public class Channel {
             @Override
             public void onError(final String reason) {
                 callback.onError(reason);
-                Channel.this.trigger(ChannelEvent.CLOSE.getPhxEvent(), new Payload(reason));
+                final Payload errorPayload = new Payload();
+                errorPayload.set("reason", reason);
+                Channel.this.trigger(ChannelEvent.CLOSE.getPhxEvent(),
+                        /* TODO - Simple callback for error reason */
+                        new Envelope(Channel.this.topic, ChannelEvent.CLOSE.getPhxEvent(), errorPayload, null));
             }
         });
     }
@@ -90,44 +93,18 @@ public class Channel {
         return this;
     }
 
-    void trigger(final String triggerEvent, final Payload payload) {
+
+    void trigger(final String triggerEvent, final Envelope envelope) {
         synchronized(bindings) {
             for (final Iterator<Binding> bindingIter = bindings.iterator(); bindingIter.hasNext(); ) {
                 final Binding binding = bindingIter.next();
                 if (binding.getEvent().equals(triggerEvent)) {
-                    binding.getCallback().onMessage(Channel.this.topic, triggerEvent, payload);
-                }
-            }
-        }
-    }
-
-    void trigger(final String triggerEvent, final Envelope envelope) {
-        if (ChannelEvent.valueOf(triggerEvent) != null) {
-            trigger(triggerEvent, envelope.getPayload());
-        } else {
-            synchronized(bindings) {
-                for (final Iterator<Binding> bindingIter = bindings.iterator(); bindingIter.hasNext(); ) {
-                    final Binding binding = bindingIter.next();
-                    if (binding.getEvent().equals(triggerEvent)) {
-                        // Channel Events get the full envelope
-                        binding.getCallback().onMessage(envelope);
-                    }
+                    // Channel Events get the full envelope
+                    binding.getCallback().onMessage(envelope);
                     break;
                 }
             }
         }
-    }
-
-    /**
-     * @param event
-     * @param payload
-     * @return The instance's self
-     * @throws IOException
-     */
-    public Channel send(final String event, final Payload payload) throws IOException {
-        final Envelope envelope = new Envelope(this.topic, event, payload, socket.makeRef());
-        socket.send(envelope);
-        return this;
     }
 
     /**
@@ -160,7 +137,6 @@ public class Channel {
         this.on(ChannelEvent.REPLY.getPhxEvent(), new ChannelCallback() {
             @Override
             public void onMessage(final Envelope envelope) {
-                // TODO @chrismccord What's the actual point of replyEventName
                 Channel.this.trigger(Socket.replyEventName(envelope.getRef()), envelope);
             }
         });
@@ -185,8 +161,7 @@ public class Channel {
     public Push leave() throws IOException {
         // TODO - Understand the "ok" received here
         return this.push(ChannelEvent.LEAVE.getPhxEvent()).receive("ok", new ChannelCallback() {
-            @Override
-            public void onMessage(final String topic, final String event, final Payload payload) {
+            public void onMessage(final Envelope envelope) {
                 try {
                     Channel.this.getSocket().leave(topic);
                 } catch (IOException e) {

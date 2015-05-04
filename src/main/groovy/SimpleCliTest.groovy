@@ -2,9 +2,10 @@ import org.phoenixframework.channels.*
 
 def chanCallback = new ChannelCallback() {
     void onChannel(Channel channel) { println "onChannel: $channel.topic" }
-    void onMessage(String topic, String event, Payload payload) { println "MESSAGE[$topic/$event]: $payload.body" }
     void onError(String reason) { println "ERROR($reason)" }
-    void onMessage(Envelope envelope) { println "MESSAGE(Envelope)[$envelope.topic/$envelope.event]: $envelope.payload.body"  }
+    void onMessage(Envelope envelope) {
+        println "MESSAGE(Envelope)[$envelope.topic/$envelope.event]: ${envelope.getPayload().get('body')}"
+    }
 }
 def socketCallback = new SocketCallback() {
     void onOpen() { println "Socket OPEN" }
@@ -23,11 +24,11 @@ def chan = socket.join("rooms:lobby", null)
     .receive("ignore", chanCallback)
     .receive("ok", chanCallback)
 chan.on("message_feed", new ChannelCallback(){
-    void onMessage(String topic, String event, Payload payload){
+    void onMessage(Envelope envelope){
         println "MESSAGES: "
-        payload.get('messages').each{ message -> println "\t${message.get('body')}"}
+        envelope.getPayload().get('messages').each{ message -> println "\t${message.get('body')}"}
     }})
-    .on("ping", new ChannelCallback() {void onMessage(String topic, String event, Payload payload){println "PING!"}})
+    .on("ping", new ChannelCallback() {void onMessage(Envelope envelope){println "PING!"}})
     .on("new_msg", chanCallback)
 
 def quit = {System.exit(0)}
@@ -36,9 +37,11 @@ def input = ""
 while(input != null) {
     input = scanner.nextLine().trim()
     println "PUSHING $input"
-    chan.push("new_msg", new Payload(input)).receive("ok", new ChannelCallback(){
-        void onMessage(String topic, String event, Payload payload){
-            println "ME: $payload.body"
+    def payload = new Payload()
+    payload.set("body", input)
+    chan.push("new_msg", payload).receive("ok", new ChannelCallback(){
+        void onMessage(Envelope envelope){
+            println "ME: ${envelope.getPayload().getResponse().get("body")}"
     }});
 }
 
