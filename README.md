@@ -15,12 +15,13 @@ gradle build
 import org.phoenixframework.channels.*
 def socket = new Socket('ws://localhost:4000/ws')
 socket.connect()
-def chan = socket.join("rooms:lobby", null)
-    .receive("ignore", new ChannelCallback(){})
-    .receive("ok", new ChannelCallback(){})
-chan.on('message_feed', new ChannelCallback(){})
-    .on('ping', new ChannelCallback(){})
-    .on('new_msg', new ChannelCallback(){})
+def chan = socket.chan()
+chan.join("rooms:lobby", null)
+    .receive("ignore", { -> println "IGNORE"})
+    .receive("ok", { envelope -> println "JOINED with $envelope" })
+chan.on('message_feed', { envelope -> println "MESSAGE FEED: $envelope"})
+    .on('ping', { -> println "PING" })
+    .on('new_msg', { -> println "NEW MESSAGE: $envelope"})
 
 ```
 
