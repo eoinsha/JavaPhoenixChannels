@@ -2,6 +2,7 @@ package org.phoenixframework.channels;
 
 import java.io.IOException;
 import java.util.*;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
@@ -12,65 +13,102 @@ public class Channel {
 
     private String topic;
     private Payload payload;
-    private ChannelCallback callback;
     private Socket socket;
-    private List<Binding> bindings = new ArrayList<>();
-    // TODO - @chrismccord  phoenix.js has unused recHooks in class Channel
+    private final List<Binding> bindings = new ArrayList<>();
     private Push joinPush;
 
-    private Map<String, PhxCallback> receiveHooks = new HashMap<>();
-
     private Timer rejoinTimer = null;
-    private TimerTask rejoinTimerTask = null;
 
-    public Channel(final String topic, final Payload payload, final ChannelCallback callback, final Socket socket) {
+    private boolean joinedOnce = false;
+    private ChannelState state = ChannelState.CLOSED;
+
+    public Channel(final String topic, final Payload payload, final Socket socket) {
         this.topic = topic;
         this.payload = payload;
-        this.callback = callback;
         this.socket = socket;
         this.joinPush = new Push(this, ChannelEvent.JOIN.getPhxEvent(), payload);
         this.rejoinTimer = new Timer("Rejoin timer for " + topic);
+
+        this.joinPush.receive("ok", new IMessageCallback() {
+            @Override
+            public void onMessage(Envelope envelope) {
+                Channel.this.state = ChannelState.JOINED;
+            }
+        });
+        this.onClose(new IMessageCallback() {
+            @Override
+            public void onMessage(Envelope envelope) {
+                Channel.this.state = ChannelState.CLOSED;
+                Channel.this.socket.remove(Channel.this);
+            }
+        });
+        this.onError(new IErrorCallback() {
+            @Override
+            public void onError(String reason) {
+                Channel.this.state = ChannelState.ERRORED;
+                scheduleRejoinTimer();
+            }
+        });
+        this.on(ChannelEvent.REPLY.getPhxEvent(), new IMessageCallback() {
+            @Override
+            public void onMessage(final Envelope envelope) {
+                Channel.this.trigger(Socket.replyEventName(envelope.getRef()), envelope);
+            }
+        });
+    }
+
+    public void rejoinUntilConnected() throws IOException {
+        if(this.state == ChannelState.ERRORED) {
+            if(this.socket.isConnected()) {
+                this.rejoin();
+            }
+            else {
+                scheduleRejoinTimer();
+            }
+        }
     }
 
     /**
-     * @param status
-     * @param callback
-     * @return The instance's self
+     * Initiates a channel join event
+     *
+     * @throws IllegalStateException Thrown if the channel has already been joined
+     * @throws IOException Thrown if the join could not be sent
      */
-    public Channel receive(final String status, final ChannelCallback callback) {
-        this.joinPush.receive(status, callback);
-        return this;
+    public Push join() throws IllegalStateException, IOException {
+        if(this.joinedOnce) {
+            throw new IllegalStateException("Tried to join multiple times. 'join' can only be invoked once per channel");
+        }
+        this.joinedOnce = true;
+        this.sendJoin();
+        return this.joinPush;
     }
 
-    public void onClose(final ChannelCallback callback) {
+    public void onClose(final IMessageCallback callback) {
         this.on(ChannelEvent.CLOSE.getPhxEvent(), callback);
     }
+
 
     /**
      * Register an error callback for the channel
      *
-     * @param callback
+     * @param callback Callback to be invoked on error
      */
-    public void onError(final PhxCallback callback) {
-        this.on(ChannelEvent.ERROR.getPhxEvent(), new ChannelCallback() {
+    public void onError(final IErrorCallback callback) {
+        this.on(ChannelEvent.ERROR.getPhxEvent(), new IMessageCallback() {
             @Override
-            public void onError(final String reason) {
-                callback.onError(reason);
-                final Payload errorPayload = new Payload();
-                errorPayload.set("reason", reason);
-                Channel.this.trigger(ChannelEvent.CLOSE.getPhxEvent(),
-                        /* TODO - Simple callback for error reason */
-                        new Envelope(Channel.this.topic, ChannelEvent.CLOSE.getPhxEvent(), errorPayload, null));
+            public void onMessage(final Envelope envelope) {
+                callback.onError((String) envelope.getPayload().get("reason"));
             }
         });
     }
 
     /**
-     * @param event
-     * @param callback
+     * @param event The event name
+     * @param callback The callback to be invoked with the event's message
+     *
      * @return The instance's self
      */
-    public Channel on(final String event, final ChannelCallback callback) {
+    public Channel on(final String event, final IMessageCallback callback) {
         synchronized(bindings) {
             this.bindings.add(new Binding(event, callback));
         }
@@ -78,7 +116,9 @@ public class Channel {
     }
 
     /**
-     * @param event
+     * Unsubscribe for event notifications
+     *
+     * @param event The event name
      * @return The instance's self
      */
     public Channel off(final String event) {
@@ -93,11 +133,16 @@ public class Channel {
         return this;
     }
 
-
+    /**
+     * Triggers event signalling to all callbacks bound to the specified event.
+     *
+     * @param triggerEvent The event name
+     * @param envelope The message's envelope relating to the event or null if not relevant.
+     */
     void trigger(final String triggerEvent, final Envelope envelope) {
+        // TODO - Trigger channel error
         synchronized(bindings) {
-            for (final Iterator<Binding> bindingIter = bindings.iterator(); bindingIter.hasNext(); ) {
-                final Binding binding = bindingIter.next();
+            for (final Binding binding : bindings) {
                 if (binding.getEvent().equals(triggerEvent)) {
                     // Channel Events get the full envelope
                     binding.getCallback().onMessage(envelope);
@@ -107,50 +152,40 @@ public class Channel {
         }
     }
 
-    /**
-     * @return The instance's self
-     */
-    public Channel reset() {
-        synchronized(bindings) {
-            this.bindings.clear();
-        }
-        final Push newJoinPush = new Push(this, ChannelEvent.JOIN.getPhxEvent(), this.payload, this.joinPush);
-        this.onError(new ChannelCallback(){
-            /* TODO - @chrismccord Figure out potentital contention betweeen this timer and the Socket reconenct timer */
-            @Override
-            public void onError(String reason) {
-                super.onError(reason);
-                Channel.this.rejoinTimerTask = new TimerTask() {
-                    @Override
-                    public void run() {
-                        try {
-                            Channel.this.rejoin();
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                            /* TODO Log and/or signal upstream */
-                        }
-                    }
-                };
-                Channel.this.rejoinTimer.schedule(Channel.this.rejoinTimerTask, Socket.RECONNECT_INTERVAL_MS, Socket.RECONNECT_INTERVAL_MS);
-            }
-        });
-        this.on(ChannelEvent.REPLY.getPhxEvent(), new ChannelCallback() {
-            @Override
-            public void onMessage(final Envelope envelope) {
-                Channel.this.trigger(Socket.replyEventName(envelope.getRef()), envelope);
-            }
-        });
-        return this;
-    }
-
     public void rejoin() throws IOException {
-        this.reset();
-        this.joinPush.send();
+        this.sendJoin();
+        // TODO - pushBuffer
     }
 
-    public Push push(final String event, final Payload payload) throws IOException {
+    /**
+     * @return true if the socket is open and the channel has joined
+     */
+    public boolean canPush() {
+        return this.socket.isConnected() && this.state == ChannelState.JOINED;
+    }
+
+    /**
+     * Pushes a payload to be sent to the channel
+     *
+     * @param event The event name
+     * @param payload The message payload
+     *
+     * @return The Push instance used to send the message
+     *
+     * @throws IOException Thrown if the payload cannot be pushed
+     * @throws IllegalStateException Thrown if the channel has not yet been joined
+     */
+    public Push push(final String event, final Payload payload) throws IOException, IllegalStateException {
+        if(!this.joinedOnce) {
+            throw new IllegalStateException("Unable to push event before channel has been joined");
+        }
         final Push pushEvent = new Push(this, event, payload);
-        pushEvent.send();
+        if(this.canPush()) {
+            pushEvent.send();
+        }
+        else {
+            // TODO - Push Buffer
+        }
         return pushEvent;
     }
 
@@ -159,15 +194,9 @@ public class Channel {
     }
 
     public Push leave() throws IOException {
-        // TODO - Understand the "ok" received here
-        return this.push(ChannelEvent.LEAVE.getPhxEvent()).receive("ok", new ChannelCallback() {
+        return this.push(ChannelEvent.LEAVE.getPhxEvent()).receive("ok", new IMessageCallback() {
             public void onMessage(final Envelope envelope) {
-                try {
-                    Channel.this.getSocket().leave(topic);
-                } catch (IOException e) {
-                    /* TODO Log and/or signal upstream */
-                    e.printStackTrace();
-                }
+                Channel.this.trigger(ChannelEvent.CLOSE.getPhxEvent(), null);
             }
         });
     }
@@ -184,6 +213,11 @@ public class Channel {
         return socket;
     }
 
+    private void sendJoin() throws IOException {
+        this.state = ChannelState.JOINING;
+        this.joinPush.send();
+    }
+
     @Override
     public String toString() {
         return "Channel{" +
@@ -191,5 +225,19 @@ public class Channel {
                 ", message=" + payload +
                 ", bindings=" + bindings +
                 '}';
+    }
+    
+    private void scheduleRejoinTimer() {
+        final TimerTask rejoinTimerTask = new TimerTask() {
+            @Override
+            public void run() {
+                try {
+                    Channel.this.rejoinUntilConnected();
+                } catch (IOException e) {
+                    LOG.log(Level.SEVERE, "Failed to rejoin", e);
+                }
+            }
+        };
+        this.rejoinTimer.schedule(rejoinTimerTask, Socket.RECONNECT_INTERVAL_MS, Socket.RECONNECT_INTERVAL_MS);
     }
 }

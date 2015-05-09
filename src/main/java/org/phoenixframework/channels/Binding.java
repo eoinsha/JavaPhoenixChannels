@@ -1,12 +1,10 @@
 package org.phoenixframework.channels;
 
-import org.phoenixframework.channels.PhxCallback;
-
 class Binding {
     final String event;
-    final ChannelCallback callback;
+    final IMessageCallback callback;
 
-    public Binding(final String event, final ChannelCallback callback) {
+    public Binding(final String event, final IMessageCallback callback) {
         this.event = event;
         this.callback = callback;
     }
@@ -15,7 +13,7 @@ class Binding {
         return event;
     }
 
-    public ChannelCallback getCallback() {
+    public IMessageCallback getCallback() {
         return callback;
     }
 }

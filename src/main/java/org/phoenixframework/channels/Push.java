@@ -1,7 +1,9 @@
 package org.phoenixframework.channels;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -11,10 +13,11 @@ class Push {
 
     private Channel channel = null;
     private String event = null;
+    private String refEvent = null;
     private Payload payload = null;
     private Envelope receivedEnvelope = null;
 //  TODO  private List afterHooks = null;
-    private Map<String, ChannelCallback> recHooks = new HashMap<String, ChannelCallback>();
+    private Map<String, List<IMessageCallback>> recHooks = new HashMap<>();
     private boolean sent = false;
 
     Push(final Channel channel, final String event, final Payload payload) {
@@ -33,16 +36,17 @@ class Push {
 
     void send() throws IOException {
         final String ref = channel.getSocket().makeRef();
-        final String refEvent = Socket.replyEventName(ref);
-
         LOG.log(Level.FINE, "Push send, ref={0}", ref);
 
-        this.channel.on(refEvent, new ChannelCallback() {
+        this.refEvent = Socket.replyEventName(ref);
+        this.receivedEnvelope = null;
+
+        this.channel.on(this.refEvent, new IMessageCallback() {
             @Override
             public void onMessage(final Envelope envelope) {
                 Push.this.receivedEnvelope = envelope;
                 Push.this.matchReceive(((Payload)receivedEnvelope.getPayload()).getResponseStatus(), envelope, ref);
-                Push.this.channel.off(refEvent);
+                Push.this.cancelRefEvent();
                 // TODO Push.this.cancelAfters();
             }
         });
@@ -50,7 +54,7 @@ class Push {
         // TODO this.startAfters();
         this.sent = true;
         final Envelope envelope = new Envelope(this.channel.getTopic(), this.event, this.payload, ref);
-        this.channel.getSocket().send(envelope);
+        this.channel.getSocket().push(envelope);
     }
 
     /**
@@ -59,25 +63,35 @@ class Push {
      *
      * @return This instance's self
      */
-    Push receive(final String status, final ChannelCallback callback) {
+    Push receive(final String status, final IMessageCallback callback) {
         if(this.receivedEnvelope != null) {
             final String receivedStatus = this.receivedEnvelope.getPayload().getResponseStatus();
             if(receivedStatus != null && receivedStatus.equals(status)) {
                 callback.onMessage(this.receivedEnvelope); // TODO - What is best to provide here. Polymorphic messages.
             }
         }
-        this.recHooks.put(status, callback);
+        synchronized(recHooks) {
+            List<IMessageCallback> statusHooks = this.recHooks.get(status);
+            if(statusHooks == null) {
+                statusHooks = new ArrayList<>();
+                this.recHooks.put(status, statusHooks);
+            }
+            statusHooks.add(callback);
+        }
+
         return this;
     }
 
+    // TODO after(ms, callback)
+    // TODO cancelAfter
+
     private void matchReceive(final String status, final Envelope envelope, final String ref) {
-        final ChannelCallback callback = this.recHooks.get(status);
-        if(callback != null) {
-            if(this.event.equals(ChannelEvent.JOIN.getPhxEvent())) {
-                callback.onChannel(this.channel);
-            }
-            else {
-                callback.onMessage(envelope);
+        synchronized (recHooks) {
+            final List<IMessageCallback> statusCallbacks = this.recHooks.get(status);
+            if(statusCallbacks != null) {
+                for (final IMessageCallback callback : statusCallbacks) {
+                    callback.onMessage(envelope);
+                }
             }
         }
     }
@@ -98,11 +112,15 @@ class Push {
         return receivedEnvelope;
     }
 
-    Map<String, ChannelCallback> getRecHooks() {
+    Map<String, List<IMessageCallback>> getRecHooks() {
         return recHooks;
     }
 
     boolean isSent() {
         return sent;
+    }
+
+    private void cancelRefEvent() {
+        this.channel.off(this.refEvent);
     }
 }

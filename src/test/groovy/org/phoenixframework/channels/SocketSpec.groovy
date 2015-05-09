@@ -7,13 +7,16 @@ class SocketSpec extends Specification {
 
     def socket = new Socket("ws://localhost:4000/ws")
 
-    def socketCallback = Mock(SocketCallback)
+    def socketOpenCallback = Mock(ISocketOpenCallback)
+    def socketCloseCallback = Mock(ISocketCloseCallback)
+    def socketMessageCallback= Mock(IMessageCallback)
+    def socketErrorCallback = Mock(IErrorCallback)
 
     def setup() {
-        socket.onOpen(socketCallback)
-        .onClose(socketCallback)
-        .onMessage(socketCallback)
-        .onError(socketCallback)
+        socket.onOpen(socketOpenCallback)
+        .onClose(socketCloseCallback)
+        .onMessage(socketMessageCallback)
+        .onError(socketErrorCallback)
     }
 
     def cleanup() {
@@ -28,18 +31,19 @@ class SocketSpec extends Specification {
     }
 
     def "Channel subscribe"() {
-        def channel = new BlockingVariable<Channel>()
-        def chanCallback = new ChannelCallback(){
-            public void onChannel(Channel chan) {
-                channel.set(chan)
+        def envelope = new BlockingVariable<Envelope>()
+        def callback = new IMessageCallback() {
+            @Override
+            void onMessage(Envelope e) {
+                envelope.set(e)
             }
         }
 
         when:
         socket.connect()
-        socket.join("rooms:lobby").receive("ok", chanCallback)
+        socket.chan("rooms:lobby").join().receive("ok", chanCallback)
         then:
-        channel.get() != null
-        channel.get().getTopic() == "rooms:lobby"
+        envelope.get() != null
+        envelope.get().getTopic() == "rooms:lobby"
     }
 }
