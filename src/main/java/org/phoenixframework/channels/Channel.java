@@ -6,7 +6,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * // TODO - Figure out the reason for after(ms, callback) in phoenix.js - ask @chrismccord
+ * Encapsulation of a Phoenix channel: a Socket, a topic and the channel's state.
  */
 public class Channel {
     private static final Logger LOG = Logger.getLogger(Channel.class.getName());
@@ -17,7 +17,7 @@ public class Channel {
     private final List<Binding> bindings = new ArrayList<>();
     private Push joinPush;
 
-    private Timer rejoinTimer = null;
+    private Timer channelTimer = null;
 
     private boolean joinedOnce = false;
     private ChannelState state = ChannelState.CLOSED;
@@ -27,7 +27,7 @@ public class Channel {
         this.payload = payload;
         this.socket = socket;
         this.joinPush = new Push(this, ChannelEvent.JOIN.getPhxEvent(), payload);
-        this.rejoinTimer = new Timer("Rejoin timer for " + topic);
+        this.channelTimer = new Timer("Phx Rejoin timer for " + topic);
 
         this.joinPush.receive("ok", new IMessageCallback() {
             @Override
@@ -140,7 +140,6 @@ public class Channel {
      * @param envelope The message's envelope relating to the event or null if not relevant.
      */
     void trigger(final String triggerEvent, final Envelope envelope) {
-        // TODO - Trigger channel error
         synchronized(bindings) {
             for (final Binding binding : bindings) {
                 if (binding.getEvent().equals(triggerEvent)) {
@@ -213,6 +212,10 @@ public class Channel {
         return socket;
     }
 
+    public void scheduleTask(TimerTask timerTask, long ms) {
+        this.channelTimer.schedule(timerTask, ms, ms);
+    }
+
     private void sendJoin() throws IOException {
         this.state = ChannelState.JOINING;
         this.joinPush.send();
@@ -238,6 +241,8 @@ public class Channel {
                 }
             }
         };
-        this.rejoinTimer.schedule(rejoinTimerTask, Socket.RECONNECT_INTERVAL_MS, Socket.RECONNECT_INTERVAL_MS);
+        scheduleTask(rejoinTimerTask, Socket.RECONNECT_INTERVAL_MS);
     }
+
+
 }

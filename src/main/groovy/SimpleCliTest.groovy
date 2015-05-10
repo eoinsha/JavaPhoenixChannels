@@ -29,8 +29,9 @@ while(input != null) {
     println "PUSHING $input"
     def payload = new Payload()
     payload.set("body", input)
-    chan.push("new_msg", payload).receive("ok", { envelope ->
-            println "ME: ${envelope.getPayload().getResponse().get("body")}"});
+    chan.push("new_msg", payload)
+            .receive("ok", { envelope -> println "ME: ${envelope.getPayload().getResponse().get("body")}"})
+            .after(500, { -> "AFTER Timeout"});
 }
 
 input = scanner.nextLine().trim()
