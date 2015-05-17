@@ -13,23 +13,14 @@ class Push {
     private String refEvent = null;
     private Payload payload = null;
     private Envelope receivedEnvelope = null;
-//  TODO  private List afterHooks = null;
     private Map<String, List<IMessageCallback>> recHooks = new HashMap<>();
     private boolean sent = false;
     private AfterHook afterHook;
 
     Push(final Channel channel, final String event, final Payload payload) {
-        this(channel, event, payload, null);
-    }
-
-    Push(final Channel channel, final String event, final Payload payload, final Push mergePush) {
         this.channel = channel;
         this.event = event;
         this.payload = payload;
-        if(mergePush != null) {
-            // TODO - Merge afterHooks ?
-            this.recHooks.putAll(mergePush.getRecHooks());
-        }
     }
 
     void send() throws IOException {

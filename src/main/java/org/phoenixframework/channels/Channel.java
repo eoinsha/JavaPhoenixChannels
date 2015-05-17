@@ -73,6 +73,8 @@ public class Channel {
      *
      * @throws IllegalStateException Thrown if the channel has already been joined
      * @throws IOException Thrown if the join could not be sent
+     *
+     * @return This Push instance
      */
     public Push join() throws IllegalStateException, IOException {
         if(this.joinedOnce) {

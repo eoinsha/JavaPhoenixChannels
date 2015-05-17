@@ -25,12 +25,12 @@ public class Socket {
     private Session wsSession = null;
     
     private String endpointUri = null;
-    private List<Channel> channels = new ArrayList<Channel>();
+    private final List<Channel> channels = new ArrayList<>();
 
     private Timer reconnectTimer = null;
     private TimerTask reconnectTimerTask = null;
 
-    private LinkedBlockingQueue<Envelope> resendQueue = new LinkedBlockingQueue<Envelope>(MAX_RESEND_MESSAGES);
+    private LinkedBlockingQueue<Envelope> resendQueue = new LinkedBlockingQueue<>(MAX_RESEND_MESSAGES);
 
     private Set<ISocketOpenCallback> socketOpenCallbacks = Collections.newSetFromMap(new WeakHashMap<ISocketOpenCallback, Boolean>());
     private Set<ISocketCloseCallback> socketCloseCallbacks = Collections.newSetFromMap(new WeakHashMap<ISocketCloseCallback, Boolean>());
@@ -151,12 +151,12 @@ public class Socket {
     /**
      * Retrieve a channel instance for the specified topic
      *
-     * @param topic
-     * @param payload
+     * @param topic The channel topic
+     * @param payload The message payload
      *
-     * @throws IOException
+     * @return A Channel instance to be used for sending and receiving events for the topic
      */
-    public Channel chan(final String topic, final Payload payload) throws IOException {
+    public Channel chan(final String topic, final Payload payload) {
         LOG.log(Level.FINE, "chan: {0}, {1}", new Object[]{topic, payload});
         final Channel channel = new Channel(topic, payload, Socket.this);
         synchronized(channels) {
@@ -168,7 +168,7 @@ public class Socket {
     /**
      * Removes the specified channel if it is known to the socket
      *
-     * @param channel
+     * @param channel The channel to be removed
      */
     public void remove(final Channel channel) {
         synchronized (channels) {
@@ -182,10 +182,12 @@ public class Socket {
     }
 
     /**
-     * TODO - Propagate exception differently
+     * Sendes a message envelope on this socket
      *
-     * @param envelope
-     * @throws IOException
+     * @param envelope The message envelope
+     * @throws IOException Thrown if the message cannot be sent
+     *
+     * @return This socket instance
      */
     public Socket push(final Envelope envelope) throws IOException {
         LOG.log(Level.FINE, "Pushing envelope: {0}", envelope);
@@ -207,7 +209,9 @@ public class Socket {
     /**
      * Register a callback for SocketEvent.OPEN events
      *
-     * @param callback
+     * @param callback The callback to receive OPEN events
+     *
+     * @return This Socket instance
      */
     public Socket onOpen(final ISocketOpenCallback callback ) {
         this.socketOpenCallbacks.add(callback);
@@ -217,7 +221,8 @@ public class Socket {
     /**
      * Register a callback for SocketEvent.ERROR events
      *
-     * @param callback
+     * @param callback The callback to receive CLOSE events
+     * @return This Socket instance
      */
     public Socket onClose(final ISocketCloseCallback callback ) {
         this.socketCloseCallbacks.add(callback);
@@ -227,7 +232,8 @@ public class Socket {
     /**
      * Register a callback for SocketEvent.ERROR events
      *
-     * @param callback
+     * @param callback The callback to receive ERROR events
+     * @return This Socket instance
      */
     public Socket onError(final IErrorCallback callback ) {
         this.errorCallbacks.add(callback);
@@ -237,7 +243,8 @@ public class Socket {
     /**
      * Register a callback for SocketEvent.MESSAGE events
      *
-     * @param callback
+     * @param callback The callback to receive MESSAGE events
+     * @return This Socket instance
      */
     public Socket onMessage(final IMessageCallback callback ) {
         this.messageCallbacks.add(callback);

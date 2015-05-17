@@ -9,9 +9,6 @@ import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/**
- * TODO - Implement field setters
- */
 @JsonIgnoreProperties(ignoreUnknown = false)
 @JsonSerialize(include = JsonSerialize.Inclusion.NON_NULL)
 public class Payload {
@@ -42,7 +39,7 @@ public class Payload {
 
 
     /**
-     * @param fieldName
+     * @param fieldName The property of the payload
      * @return The value for the dynamic field in the payload
      */
     public Object get(final String fieldName) {
