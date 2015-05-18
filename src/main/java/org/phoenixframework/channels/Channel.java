@@ -1,7 +1,11 @@
 package org.phoenixframework.channels;
 
+import com.squareup.okhttp.ws.WebSocket;
+import okio.Buffer;
+
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -21,6 +25,8 @@ public class Channel {
 
     private boolean joinedOnce = false;
     private ChannelState state = ChannelState.CLOSED;
+
+    private ConcurrentLinkedDeque<Push> pushBuffer = new ConcurrentLinkedDeque<>();
 
     public Channel(final String topic, final Payload payload, final Socket socket) {
         this.topic = topic;
@@ -99,7 +105,8 @@ public class Channel {
         this.on(ChannelEvent.ERROR.getPhxEvent(), new IMessageCallback() {
             @Override
             public void onMessage(final Envelope envelope) {
-                callback.onError((String) envelope.getPayload().get("reason"));
+                final Payload payload = envelope.getPayload();
+                callback.onError(payload == null ? null : (String) payload.get("reason"));
             }
         });
     }
@@ -155,7 +162,9 @@ public class Channel {
 
     public void rejoin() throws IOException {
         this.sendJoin();
-        // TODO - pushBuffer
+        while(!this.pushBuffer.isEmpty()) {
+            this.pushBuffer.removeFirst().send();
+        }
     }
 
     /**
@@ -185,7 +194,7 @@ public class Channel {
             pushEvent.send();
         }
         else {
-            // TODO - Push Buffer
+            this.pushBuffer.add(pushEvent);
         }
         return pushEvent;
     }

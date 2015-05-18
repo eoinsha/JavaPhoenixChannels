@@ -27,7 +27,7 @@ class SocketSpec extends Specification {
         when:
         socket.connect()
         then:
-        1 * socketCallback.onOpen()
+        1 * socketOpenCallback  .onOpen()
     }
 
     def "Channel subscribe"() {
@@ -41,7 +41,7 @@ class SocketSpec extends Specification {
 
         when:
         socket.connect()
-        socket.chan("rooms:lobby").join().receive("ok", chanCallback)
+        socket.chan("rooms:lobby", null).join().receive("ok", callback)
         then:
         envelope.get() != null
         envelope.get().getTopic() == "rooms:lobby"

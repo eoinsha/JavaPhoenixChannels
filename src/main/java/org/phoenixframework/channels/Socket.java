@@ -1,36 +1,38 @@
 package org.phoenixframework.channels;
 
+import com.squareup.okhttp.OkHttpClient;
+import com.squareup.okhttp.Request;
+import com.squareup.okhttp.Response;
+import com.squareup.okhttp.ws.WebSocket;
+import com.squareup.okhttp.ws.WebSocketCall;
+import com.squareup.okhttp.ws.WebSocketListener;
+import okio.Buffer;
+import okio.BufferedSource;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.node.ObjectNode;
 
 import java.io.IOException;
-import java.net.URI;
 import java.util.*;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.websocket.*;
 
 public class Socket {
     private static final Logger LOG = Logger.getLogger(Socket.class.getName());
-
-    public static final int MAX_RESEND_MESSAGES = 50;
 
     public static final int RECONNECT_INTERVAL_MS = 5000;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    private final WebSocketContainer wsContainer = ContainerProvider.getWebSocketContainer();
-    private Session wsSession = null;
-    
+    private final OkHttpClient httpClient = new OkHttpClient();
+    private WebSocket webSocket = null;
+
     private String endpointUri = null;
     private final List<Channel> channels = new ArrayList<>();
 
-    private Timer reconnectTimer = null;
+    private Timer timer = null;
     private TimerTask reconnectTimerTask = null;
-
-    private LinkedBlockingQueue<Envelope> resendQueue = new LinkedBlockingQueue<>(MAX_RESEND_MESSAGES);
 
     private Set<ISocketOpenCallback> socketOpenCallbacks = Collections.newSetFromMap(new WeakHashMap<ISocketOpenCallback, Boolean>());
     private Set<ISocketCloseCallback> socketCloseCallbacks = Collections.newSetFromMap(new WeakHashMap<ISocketCloseCallback, Boolean>());
@@ -42,31 +44,60 @@ public class Socket {
     /**
      * Annotated WS Endpoint. Private member to prevent confusion with "onConn*" registration methods.
      */
-    private PhoenixWSEndpoint wsEndpoint = new PhoenixWSEndpoint();
+    private PhoenixWSListener wsListener = new PhoenixWSListener();
+    private ConcurrentLinkedDeque<Buffer> sendBuffer = new ConcurrentLinkedDeque<>();
 
-    @ClientEndpoint
-    public class PhoenixWSEndpoint{
-        private PhoenixWSEndpoint(){}
+    public class PhoenixWSListener implements WebSocketListener {
+        private PhoenixWSListener(){}
 
-        @OnOpen
-        public void onConnOpen(final Session session) {
-            LOG.log(Level.FINE, "WebSocket onOpen: {0}", session);
-            Socket.this.wsSession = session;
+        @Override
+        public void onOpen(final WebSocket webSocket, final Request request, final Response response) throws IOException {
+            LOG.log(Level.FINE, "WebSocket onOpen: {0}", webSocket);
+            Socket.this.webSocket = webSocket;
             if(Socket.this.reconnectTimerTask != null) {
                 Socket.this.reconnectTimerTask.cancel();
             }
 
             // TODO - Heartbeat
-
             for(final ISocketOpenCallback callback : socketOpenCallbacks) {
                 callback.onOpen();
             }
+
+            Socket.this.flushSendBuffer();
         }
 
-        @OnClose
-        public void onConnClose(final Session session, final CloseReason reason) {
-            LOG.log(Level.FINE, "WebSocket onClose {0}, {1}", new Object[]{session, reason});
-            Socket.this.wsSession = null;
+        @Override
+        public void onMessage(final BufferedSource payload, final WebSocket.PayloadType type) throws IOException {
+            LOG.log(Level.FINE, "Envelope received: {0}", payload);
+            if(type == WebSocket.PayloadType.TEXT) {
+                try {
+                    final Envelope envelope = objectMapper.readValue(payload.readUtf8(), Envelope.class);
+                    payload.close();
+                    for (final Channel channel : channels) {
+                        if (channel.isMember(envelope.getTopic())) {
+                            channel.trigger(envelope.getEvent(), envelope);
+                        }
+                    }
+
+                    for (final IMessageCallback callback : messageCallbacks) {
+                        callback.onMessage(envelope);
+                    }
+                } catch (IOException e) {
+                    // TODO: log, signal
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        @Override
+        public void onPong(final Buffer payload) {
+            LOG.log(Level.INFO, "PONG received: {0}", payload);
+        }
+
+        @Override
+        public void onClose(final int code, final String reason) {
+            LOG.log(Level.FINE, "WebSocket onClose {0}/{1}", new Object[]{code, reason});
+            Socket.this.webSocket = null;
             if(Socket.this.reconnectTimerTask != null) {
                 Socket.this.reconnectTimerTask.cancel();
             }
@@ -80,71 +111,55 @@ public class Socket {
                     try {
                         Socket.this.connect();
                     } catch (Exception e) {
-                        LOG.log(Level.SEVERE, "Failed to reconnect to " + Socket.this.wsEndpoint, e);
+                        LOG.log(Level.SEVERE, "Failed to reconnect to " + Socket.this.wsListener, e);
                     }
                 }
             };
-            reconnectTimer.schedule(Socket.this.reconnectTimerTask, RECONNECT_INTERVAL_MS, RECONNECT_INTERVAL_MS);
+            timer.schedule(Socket.this.reconnectTimerTask, RECONNECT_INTERVAL_MS, RECONNECT_INTERVAL_MS);
 
             for(final ISocketCloseCallback callback : socketCloseCallbacks) {
                 callback.onClose();
             }
         }
 
-        @OnMessage
-        public void onConnTextMessage(final String payloadText) {
-            LOG.log(Level.FINE, "Envelope received: {0}", payloadText);
-            try {
-                final Envelope envelope = objectMapper.readValue(payloadText, Envelope.class);
-                for(final Channel channel : channels) {
-                    if(channel.isMember(envelope.getTopic())) {
-                        channel.trigger(envelope.getEvent(), envelope);
-                    }
-                }
-
-                for(final IMessageCallback callback : messageCallbacks) {
-                    callback.onMessage(envelope);
-                }
-            } catch (IOException e) {
-                // TODO: log, signal
-                e.printStackTrace();
-            }
-        }
-
-        @OnError
-        public void onConnError(final Throwable error) {
-            LOG.log(Level.WARNING, "WebSocket connection error", error);
+        @Override
+        public void onFailure(final IOException e) {
+            LOG.log(Level.WARNING, "WebSocket connection error", e);
             for(final IErrorCallback callback : errorCallbacks) {
                 triggerChannelError();
-                callback.onError(error.toString());
+                callback.onError(e.toString());
             }
         }
     }
 
-    public Socket(final String endpointUri) throws IOException, DeploymentException {
+    public Socket(final String endpointUri) throws IOException {
         LOG.log(Level.FINE, "PhoenixSocket({0})", endpointUri);
         this.endpointUri = endpointUri;
-        this.reconnectTimer = new Timer("Reconnect Timer for " + endpointUri);
+        this.timer = new Timer("Reconnect Timer for " + endpointUri);
     }
 
     public void disconnect() throws IOException {
         LOG.log(Level.FINE, "disconnect");
-        if(wsSession != null && wsSession.isOpen()) {
-            wsSession.close();
+        if(webSocket != null) {
+            webSocket.close(1001 /*CLOSE_GOING_AWAY*/, "Disconnected by client");
         }
     }
 
-    public void connect() throws IOException, DeploymentException {
+    public void connect() throws IOException {
         LOG.log(Level.FINE, "connect");
         disconnect();
-        wsContainer.connectToServer(wsEndpoint, URI.create(this.endpointUri));
+        // No support for ws:// or ws:// in okhttp. See https://github.com/square/okhttp/issues/1652
+        final String httpUrl = this.endpointUri.replaceFirst("^ws:", "http:").replaceFirst("^wss:", "https:");
+        final Request request = new Request.Builder().url(httpUrl).build();
+        final WebSocketCall wsCall = WebSocketCall.create(httpClient, request);
+        wsCall.enqueue(wsListener);
     }
 
     /**
      * @return true if the socket connection is connected
      */
     public boolean isConnected() {
-        return wsSession != null && wsSession.isOpen();
+        return webSocket != null;
     }
 
 
@@ -182,7 +197,7 @@ public class Socket {
     }
 
     /**
-     * Sendes a message envelope on this socket
+     * Sends a message envelope on this socket
      *
      * @param envelope The message envelope
      * @throws IOException Thrown if the message cannot be sent
@@ -191,15 +206,21 @@ public class Socket {
      */
     public Socket push(final Envelope envelope) throws IOException {
         LOG.log(Level.FINE, "Pushing envelope: {0}", envelope);
+        final ObjectNode node = objectMapper.createObjectNode();
+        node.put("topic", envelope.getTopic());
+        node.put("event", envelope.getEvent());
+        node.put("ref", envelope.getRef());
+        node.putPOJO("payload", envelope.getPayload() == null ? new Payload() : envelope.getPayload());
+        final String json = objectMapper.writeValueAsString(node);
+        LOG.log(Level.FINE, "Sending JSON: {0}", json);
+        final Buffer payload = new Buffer();
+        payload.writeUtf8(json);
+
         if(this.isConnected()) {
-            final ObjectNode node = objectMapper.createObjectNode();
-            node.put("topic", envelope.getTopic());
-            node.put("event", envelope.getEvent());
-            node.put("ref", envelope.getRef());
-            node.putPOJO("payload", envelope.getPayload() == null ? new Payload() : envelope.getPayload());
-            final String json = objectMapper.writeValueAsString(node);
-            LOG.log(Level.FINE, "Sending JSON: {0}", json);
-            wsSession.getAsyncRemote().sendText(json);
+            webSocket.sendMessage(WebSocket.PayloadType.TEXT, payload);
+        }
+        else {
+            this.sendBuffer.add(payload);
         }
         // TODO - Queue data if not connected
 
@@ -257,7 +278,7 @@ public class Socket {
                 "endpointUri='" + endpointUri + '\'' +
                 ", channels=" + channels +
                 ", refNo=" + refNo +
-                ", wsSession=" + wsSession +
+                ", webSocket=" + webSocket +
                 '}';
     }
 
@@ -272,6 +293,17 @@ public class Socket {
     private void triggerChannelError() {
         for(final Channel channel : channels) {
             channel.trigger(ChannelEvent.ERROR.getPhxEvent(), null);
+        }
+    }
+
+    private void flushSendBuffer() {
+        while(this.isConnected() && !this.sendBuffer.isEmpty()) {
+            final Buffer buffer = this.sendBuffer.removeFirst();
+            try {
+                this.webSocket.sendMessage(WebSocket.PayloadType.TEXT, buffer);
+            } catch (IOException e) {
+                LOG.log(Level.SEVERE, "Failed to send payload {0}", buffer);
+            }
         }
     }
 
