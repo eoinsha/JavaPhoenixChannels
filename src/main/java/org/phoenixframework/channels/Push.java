@@ -5,7 +5,7 @@ import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-class Push {
+public class Push {
     private static final Logger LOG = Logger.getLogger(Push.class.getName());
 
     private Channel channel = null;
@@ -23,36 +23,15 @@ class Push {
         this.payload = payload;
     }
 
-    void send() throws IOException {
-        final String ref = channel.getSocket().makeRef();
-        LOG.log(Level.FINE, "Push send, ref={0}", ref);
-
-        this.refEvent = Socket.replyEventName(ref);
-        this.receivedEnvelope = null;
-
-        this.channel.on(this.refEvent, new IMessageCallback() {
-            @Override
-            public void onMessage(final Envelope envelope) {
-                Push.this.receivedEnvelope = envelope;
-                Push.this.matchReceive(((Payload)receivedEnvelope.getPayload()).getResponseStatus(), envelope, ref);
-                Push.this.cancelRefEvent();
-                Push.this.cancelAfter();
-            }
-        });
-
-        this.startAfter();
-        this.sent = true;
-        final Envelope envelope = new Envelope(this.channel.getTopic(), this.event, this.payload, ref);
-        this.channel.getSocket().push(envelope);
-    }
-
     /**
-     * @param status
-     * @param callback
+     * Registers for notifications on status messages
+     *
+     * @param status The message status to register callbacks on
+     * @param callback The callback handler
      *
      * @return This instance's self
      */
-    Push receive(final String status, final IMessageCallback callback) {
+    public Push receive(final String status, final IMessageCallback callback) {
         if(this.receivedEnvelope != null) {
             final String receivedStatus = this.receivedEnvelope.getPayload().getResponseStatus();
             if(receivedStatus != null && receivedStatus.equals(status)) {
@@ -88,6 +67,30 @@ class Push {
         }
         this.afterHook = new AfterHook(ms, callback, timerTask);
         return this;
+    }
+
+
+    void send() throws IOException {
+        final String ref = channel.getSocket().makeRef();
+        LOG.log(Level.FINE, "Push send, ref={0}", ref);
+
+        this.refEvent = Socket.replyEventName(ref);
+        this.receivedEnvelope = null;
+
+        this.channel.on(this.refEvent, new IMessageCallback() {
+            @Override
+            public void onMessage(final Envelope envelope) {
+                Push.this.receivedEnvelope = envelope;
+                Push.this.matchReceive(((Payload)receivedEnvelope.getPayload()).getResponseStatus(), envelope, ref);
+                Push.this.cancelRefEvent();
+                Push.this.cancelAfter();
+            }
+        });
+
+        this.startAfter();
+        this.sent = true;
+        final Envelope envelope = new Envelope(this.channel.getTopic(), this.event, this.payload, ref);
+        this.channel.getSocket().push(envelope);
     }
 
     private void cancelAfter() {
