@@ -48,18 +48,19 @@ public class Socket {
     private ConcurrentLinkedDeque<Buffer> sendBuffer = new ConcurrentLinkedDeque<>();
 
     public class PhoenixWSListener implements WebSocketListener {
-        private PhoenixWSListener(){}
+        private PhoenixWSListener() {
+        }
 
         @Override
         public void onOpen(final WebSocket webSocket, final Request request, final Response response) throws IOException {
             LOG.log(Level.FINE, "WebSocket onOpen: {0}", webSocket);
             Socket.this.webSocket = webSocket;
-            if(Socket.this.reconnectTimerTask != null) {
+            if (Socket.this.reconnectTimerTask != null) {
                 Socket.this.reconnectTimerTask.cancel();
             }
 
             // TODO - Heartbeat
-            for(final ISocketOpenCallback callback : socketOpenCallbacks) {
+            for (final ISocketOpenCallback callback : socketOpenCallbacks) {
                 callback.onOpen();
             }
 
@@ -69,10 +70,10 @@ public class Socket {
         @Override
         public void onMessage(final BufferedSource payload, final WebSocket.PayloadType type) throws IOException {
             LOG.log(Level.FINE, "Envelope received: {0}", payload);
-            if(type == WebSocket.PayloadType.TEXT) {
-                try {
-                    final Envelope envelope = objectMapper.readValue(payload.readUtf8(), Envelope.class);
-                    payload.close();
+
+            try {
+                if (type == WebSocket.PayloadType.TEXT) {
+                    final Envelope envelope = objectMapper.readValue(payload.inputStream(), Envelope.class);
                     for (final Channel channel : channels) {
                         if (channel.isMember(envelope.getTopic())) {
                             channel.trigger(envelope.getEvent(), envelope);
@@ -82,10 +83,12 @@ public class Socket {
                     for (final IMessageCallback callback : messageCallbacks) {
                         callback.onMessage(envelope);
                     }
-                } catch (IOException e) {
-                    // TODO: log, signal
-                    e.printStackTrace();
                 }
+            } catch (IOException e) {
+                LOG.log(Level.SEVERE, "Failed to read message payload", e);
+            }
+            finally {
+                payload.close();
             }
         }
 
@@ -98,7 +101,7 @@ public class Socket {
         public void onClose(final int code, final String reason) {
             LOG.log(Level.FINE, "WebSocket onClose {0}/{1}", new Object[]{code, reason});
             Socket.this.webSocket = null;
-            if(Socket.this.reconnectTimerTask != null) {
+            if (Socket.this.reconnectTimerTask != null) {
                 Socket.this.reconnectTimerTask.cancel();
             }
 
@@ -117,7 +120,7 @@ public class Socket {
             };
             timer.schedule(Socket.this.reconnectTimerTask, RECONNECT_INTERVAL_MS, RECONNECT_INTERVAL_MS);
 
-            for(final ISocketCloseCallback callback : socketCloseCallbacks) {
+            for (final ISocketCloseCallback callback : socketCloseCallbacks) {
                 callback.onClose();
             }
         }
@@ -125,7 +128,7 @@ public class Socket {
         @Override
         public void onFailure(final IOException e) {
             LOG.log(Level.WARNING, "WebSocket connection error", e);
-            for(final IErrorCallback callback : errorCallbacks) {
+            for (final IErrorCallback callback : errorCallbacks) {
                 triggerChannelError();
                 callback.onError(e.toString());
             }
@@ -140,7 +143,7 @@ public class Socket {
 
     public void disconnect() throws IOException {
         LOG.log(Level.FINE, "disconnect");
-        if(webSocket != null) {
+        if (webSocket != null) {
             webSocket.close(1001 /*CLOSE_GOING_AWAY*/, "Disconnected by client");
         }
     }
@@ -166,15 +169,14 @@ public class Socket {
     /**
      * Retrieve a channel instance for the specified topic
      *
-     * @param topic The channel topic
+     * @param topic   The channel topic
      * @param payload The message payload
-     *
      * @return A Channel instance to be used for sending and receiving events for the topic
      */
     public Channel chan(final String topic, final Payload payload) {
         LOG.log(Level.FINE, "chan: {0}, {1}", new Object[]{topic, payload});
         final Channel channel = new Channel(topic, payload, Socket.this);
-        synchronized(channels) {
+        synchronized (channels) {
             channels.add(channel);
         }
         return channel;
@@ -187,8 +189,8 @@ public class Socket {
      */
     public void remove(final Channel channel) {
         synchronized (channels) {
-            for(final Iterator chanIter = channels.iterator(); chanIter.hasNext();) {
-                if(chanIter.next() == channel) {
+            for (final Iterator chanIter = channels.iterator(); chanIter.hasNext(); ) {
+                if (chanIter.next() == channel) {
                     chanIter.remove();
                     break;
                 }
@@ -200,9 +202,8 @@ public class Socket {
      * Sends a message envelope on this socket
      *
      * @param envelope The message envelope
-     * @throws IOException Thrown if the message cannot be sent
-     *
      * @return This socket instance
+     * @throws IOException Thrown if the message cannot be sent
      */
     public Socket push(final Envelope envelope) throws IOException {
         LOG.log(Level.FINE, "Pushing envelope: {0}", envelope);
@@ -216,10 +217,9 @@ public class Socket {
         final Buffer payload = new Buffer();
         payload.writeUtf8(json);
 
-        if(this.isConnected()) {
+        if (this.isConnected()) {
             webSocket.sendMessage(WebSocket.PayloadType.TEXT, payload);
-        }
-        else {
+        } else {
             this.sendBuffer.add(payload);
         }
         // TODO - Queue data if not connected
@@ -231,10 +231,9 @@ public class Socket {
      * Register a callback for SocketEvent.OPEN events
      *
      * @param callback The callback to receive OPEN events
-     *
      * @return This Socket instance
      */
-    public Socket onOpen(final ISocketOpenCallback callback ) {
+    public Socket onOpen(final ISocketOpenCallback callback) {
         this.socketOpenCallbacks.add(callback);
         return this;
     }
@@ -245,7 +244,7 @@ public class Socket {
      * @param callback The callback to receive CLOSE events
      * @return This Socket instance
      */
-    public Socket onClose(final ISocketCloseCallback callback ) {
+    public Socket onClose(final ISocketCloseCallback callback) {
         this.socketCloseCallbacks.add(callback);
         return this;
     }
@@ -256,7 +255,7 @@ public class Socket {
      * @param callback The callback to receive ERROR events
      * @return This Socket instance
      */
-    public Socket onError(final IErrorCallback callback ) {
+    public Socket onError(final IErrorCallback callback) {
         this.errorCallbacks.add(callback);
         return this;
     }
@@ -267,7 +266,7 @@ public class Socket {
      * @param callback The callback to receive MESSAGE events
      * @return This Socket instance
      */
-    public Socket onMessage(final IMessageCallback callback ) {
+    public Socket onMessage(final IMessageCallback callback) {
         this.messageCallbacks.add(callback);
         return this;
     }
@@ -284,20 +283,20 @@ public class Socket {
 
     synchronized String makeRef() {
         int val = refNo++;
-        if(refNo == Integer.MAX_VALUE) {
+        if (refNo == Integer.MAX_VALUE) {
             refNo = 0;
         }
         return Integer.toString(val);
     }
 
     private void triggerChannelError() {
-        for(final Channel channel : channels) {
+        for (final Channel channel : channels) {
             channel.trigger(ChannelEvent.ERROR.getPhxEvent(), null);
         }
     }
 
     private void flushSendBuffer() {
-        while(this.isConnected() && !this.sendBuffer.isEmpty()) {
+        while (this.isConnected() && !this.sendBuffer.isEmpty()) {
             final Buffer buffer = this.sendBuffer.removeFirst();
             try {
                 this.webSocket.sendMessage(WebSocket.PayloadType.TEXT, buffer);
