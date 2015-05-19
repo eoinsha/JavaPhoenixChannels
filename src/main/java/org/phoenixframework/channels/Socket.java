@@ -11,6 +11,7 @@ import com.squareup.okhttp.ws.WebSocketListener;
 import okio.Buffer;
 import okio.BufferedSource;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -55,9 +56,7 @@ public class Socket {
         public void onOpen(final WebSocket webSocket, final Request request, final Response response) throws IOException {
             LOG.log(Level.FINE, "WebSocket onOpen: {0}", webSocket);
             Socket.this.webSocket = webSocket;
-            if (Socket.this.reconnectTimerTask != null) {
-                Socket.this.reconnectTimerTask.cancel();
-            }
+            cancelReconnectTimer();
 
             // TODO - Heartbeat
             for (final ISocketOpenCallback callback : socketOpenCallbacks) {
@@ -86,8 +85,7 @@ public class Socket {
                 }
             } catch (IOException e) {
                 LOG.log(Level.SEVERE, "Failed to read message payload", e);
-            }
-            finally {
+            } finally {
                 payload.close();
             }
         }
@@ -101,24 +99,7 @@ public class Socket {
         public void onClose(final int code, final String reason) {
             LOG.log(Level.FINE, "WebSocket onClose {0}/{1}", new Object[]{code, reason});
             Socket.this.webSocket = null;
-            if (Socket.this.reconnectTimerTask != null) {
-                Socket.this.reconnectTimerTask.cancel();
-            }
-
-            // TODO - Clear heartbeat timer
-
-            Socket.this.reconnectTimerTask = new TimerTask() {
-                @Override
-                public void run() {
-                    LOG.log(Level.FINE, "reconnectTimerTask run");
-                    try {
-                        Socket.this.connect();
-                    } catch (Exception e) {
-                        LOG.log(Level.SEVERE, "Failed to reconnect to " + Socket.this.wsListener, e);
-                    }
-                }
-            };
-            timer.schedule(Socket.this.reconnectTimerTask, RECONNECT_INTERVAL_MS, RECONNECT_INTERVAL_MS);
+            scheduleReconnectTimer();
 
             for (final ISocketCloseCallback callback : socketCloseCallbacks) {
                 callback.onClose();
@@ -128,10 +109,53 @@ public class Socket {
         @Override
         public void onFailure(final IOException e) {
             LOG.log(Level.WARNING, "WebSocket connection error", e);
-            for (final IErrorCallback callback : errorCallbacks) {
-                triggerChannelError();
-                callback.onError(e.toString());
+            try {
+                for (final IErrorCallback callback : errorCallbacks) {
+                    triggerChannelError();
+                    callback.onError(e.toString());
+                }
             }
+            finally {
+                // Assume closed on failure
+                if(Socket.this.webSocket != null) {
+                    try {
+                        Socket.this.webSocket.close(1001 /*CLOSE_GOING_AWAY*/, "EOF received");
+                    } catch (IOException ioe) {
+                        LOG.log(Level.WARNING, "Failed to explicitly close following failure");
+                    } finally {
+                        Socket.this.webSocket = null;
+                    }
+                }
+                scheduleReconnectTimer();
+            }
+        }
+    }
+
+    /**
+     * Sets up and schedules a timer task to make repeated reconnect attempts at configured intervals
+     */
+    private void scheduleReconnectTimer() {
+        cancelReconnectTimer();
+
+        // TODO - Clear heartbeat timer
+
+        Socket.this.reconnectTimerTask = new TimerTask() {
+            @Override
+            public void run() {
+                LOG.log(Level.FINE, "reconnectTimerTask run");
+                try {
+                    Socket.this.connect();
+                } catch (Exception e) {
+                    LOG.log(Level.SEVERE, "Failed to reconnect to " + Socket.this.wsListener, e);
+                }
+            }
+        };
+        timer.schedule(Socket.this.reconnectTimerTask, RECONNECT_INTERVAL_MS);
+    }
+
+    private void cancelReconnectTimer() {
+        if (Socket.this.reconnectTimerTask != null) {
+            Socket.this.reconnectTimerTask.cancel();
         }
     }
 
@@ -218,7 +242,12 @@ public class Socket {
         payload.writeUtf8(json);
 
         if (this.isConnected()) {
-            webSocket.sendMessage(WebSocket.PayloadType.TEXT, payload);
+            try {
+                webSocket.sendMessage(WebSocket.PayloadType.TEXT, payload);
+            }
+            catch(IllegalStateException e) {
+                LOG.log(Level.SEVERE, "Attempted to send push when socket is not open", e);
+            }
         } else {
             this.sendBuffer.add(payload);
         }
@@ -234,6 +263,7 @@ public class Socket {
      * @return This Socket instance
      */
     public Socket onOpen(final ISocketOpenCallback callback) {
+        cancelReconnectTimer();
         this.socketOpenCallbacks.add(callback);
         return this;
     }
