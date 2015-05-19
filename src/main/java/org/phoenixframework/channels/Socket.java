@@ -1,5 +1,7 @@
 package org.phoenixframework.channels;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.squareup.okhttp.OkHttpClient;
 import com.squareup.okhttp.Request;
 import com.squareup.okhttp.Response;
@@ -8,8 +10,6 @@ import com.squareup.okhttp.ws.WebSocketCall;
 import com.squareup.okhttp.ws.WebSocketListener;
 import okio.Buffer;
 import okio.BufferedSource;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.node.ObjectNode;
 
 import java.io.IOException;
 import java.util.*;
@@ -187,7 +187,7 @@ public class Socket {
      */
     public void remove(final Channel channel) {
         synchronized (channels) {
-            for(Iterator chanIter = channels.iterator(); chanIter.hasNext();) {
+            for(final Iterator chanIter = channels.iterator(); chanIter.hasNext();) {
                 if(chanIter.next() == channel) {
                     chanIter.remove();
                     break;

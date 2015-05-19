@@ -1,6 +1,7 @@
 package org.phoenixframework.channels;
 
-import org.codehaus.jackson.annotate.JsonProperty;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.logging.Logger;
 
@@ -19,6 +20,7 @@ public class Envelope {
     @JsonProperty
     private String ref;
 
+    @SuppressWarnings("unused")
     public Envelope() {}
 
     public Envelope(final String topic, final String event, final Payload payload, final String ref) {
