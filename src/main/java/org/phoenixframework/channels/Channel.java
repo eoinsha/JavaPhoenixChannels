@@ -1,7 +1,6 @@
 package org.phoenixframework.channels;
 
-import com.squareup.okhttp.ws.WebSocket;
-import okio.Buffer;
+import com.fasterxml.jackson.databind.JsonNode;
 
 import java.io.IOException;
 import java.util.*;
@@ -16,7 +15,7 @@ public class Channel {
     private static final Logger LOG = Logger.getLogger(Channel.class.getName());
 
     private String topic;
-    private Payload payload;
+    private JsonNode payload;
     private Socket socket;
     private final List<Binding> bindings = new ArrayList<>();
     private Push joinPush;
@@ -28,7 +27,7 @@ public class Channel {
 
     private ConcurrentLinkedDeque<Push> pushBuffer = new ConcurrentLinkedDeque<>();
 
-    public Channel(final String topic, final Payload payload, final Socket socket) {
+    public Channel(final String topic, final JsonNode payload, final Socket socket) {
         this.topic = topic;
         this.payload = payload;
         this.socket = socket;
@@ -105,8 +104,8 @@ public class Channel {
         this.on(ChannelEvent.ERROR.getPhxEvent(), new IMessageCallback() {
             @Override
             public void onMessage(final Envelope envelope) {
-                final Payload payload = envelope == null ? null : envelope.getPayload();
-                callback.onError(payload == null ? null : (String) payload.get("reason"));
+                final String reason = envelope.getReason();
+                callback.onError(reason);
             }
         });
     }
@@ -185,7 +184,7 @@ public class Channel {
      * @throws IOException Thrown if the payload cannot be pushed
      * @throws IllegalStateException Thrown if the channel has not yet been joined
      */
-    public Push push(final String event, final Payload payload) throws IOException, IllegalStateException {
+    public Push push(final String event, final JsonNode payload) throws IOException, IllegalStateException {
         if(!this.joinedOnce) {
             throw new IllegalStateException("Unable to push event before channel has been joined");
         }

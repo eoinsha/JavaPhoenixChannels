@@ -1,5 +1,7 @@
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.phoenixframework.channels.*
 
+def jsonObjectMapper = new ObjectMapper()
 def chanCallback = { envelope ->
         println "MESSAGE(Envelope)[$envelope.topic/$envelope.event]: ${envelope.getPayload().get('body')}"
 }
@@ -27,10 +29,10 @@ def input = ""
 while(input != null) {
     input = scanner.nextLine().trim()
     println "PUSHING $input"
-    def payload = new Payload()
-    payload.set("body", input)
+    def payload = jsonObjectMapper.createObjectNode()
+    payload.put("body", input)
     chan.push("new_msg", payload)
-            .receive("ok", { envelope -> println "ME: ${envelope.getPayload().getResponse().get("body")}"})
+            .receive("ok", { envelope -> println "ME: ${envelope.getPayload().get("response").get("body")}"})
             .after(500, { -> "AFTER Timeout"});
 }
 

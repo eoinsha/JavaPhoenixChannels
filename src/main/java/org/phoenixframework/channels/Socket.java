@@ -1,6 +1,8 @@
 package org.phoenixframework.channels;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.BaseJsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.squareup.okhttp.OkHttpClient;
 import com.squareup.okhttp.Request;
@@ -11,7 +13,6 @@ import com.squareup.okhttp.ws.WebSocketListener;
 import okio.Buffer;
 import okio.BufferedSource;
 
-import java.io.EOFException;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -72,7 +73,8 @@ public class Socket {
 
             try {
                 if (type == WebSocket.PayloadType.TEXT) {
-                    final Envelope envelope = objectMapper.readValue(payload.inputStream(), Envelope.class);
+                    final Envelope envelope =
+                            objectMapper.readValue(payload.inputStream(), Envelope.class);
                     for (final Channel channel : channels) {
                         if (channel.isMember(envelope.getTopic())) {
                             channel.trigger(envelope.getEvent(), envelope);
@@ -150,7 +152,7 @@ public class Socket {
                 }
             }
         };
-        timer.schedule(Socket.this.reconnectTimerTask, RECONNECT_INTERVAL_MS);
+        timer.schedule(Socket.this.reconnectTimerTask, RECONNECT_INTERVAL_MS    );
     }
 
     private void cancelReconnectTimer() {
@@ -197,7 +199,7 @@ public class Socket {
      * @param payload The message payload
      * @return A Channel instance to be used for sending and receiving events for the topic
      */
-    public Channel chan(final String topic, final Payload payload) {
+    public Channel chan(final String topic, final JsonNode payload) {
         LOG.log(Level.FINE, "chan: {0}, {1}", new Object[]{topic, payload});
         final Channel channel = new Channel(topic, payload, Socket.this);
         synchronized (channels) {
@@ -235,7 +237,7 @@ public class Socket {
         node.put("topic", envelope.getTopic());
         node.put("event", envelope.getEvent());
         node.put("ref", envelope.getRef());
-        node.putPOJO("payload", envelope.getPayload() == null ? new Payload() : envelope.getPayload());
+        node.set("payload", envelope.getPayload() == null ? objectMapper.createObjectNode() : envelope.getPayload());
         final String json = objectMapper.writeValueAsString(node);
         LOG.log(Level.FINE, "Sending JSON: {0}", json);
         final Buffer payload = new Buffer();
@@ -251,7 +253,6 @@ public class Socket {
         } else {
             this.sendBuffer.add(payload);
         }
-        // TODO - Queue data if not connected
 
         return this;
     }

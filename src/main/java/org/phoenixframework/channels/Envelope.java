@@ -2,6 +2,7 @@ package org.phoenixframework.channels;
 
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.JsonNode;
 
 import java.util.logging.Logger;
 
@@ -15,7 +16,7 @@ public class Envelope {
     private String event;
 
     @JsonProperty(value="payload")
-    private Payload payload;
+    private JsonNode payload;
 
     @JsonProperty
     private String ref;
@@ -23,7 +24,7 @@ public class Envelope {
     @SuppressWarnings("unused")
     public Envelope() {}
 
-    public Envelope(final String topic, final String event, final Payload payload, final String ref) {
+    public Envelope(final String topic, final String event, final JsonNode payload, final String ref) {
         this.topic = topic;
         this.event = event;
         this.payload = payload;
@@ -38,13 +39,40 @@ public class Envelope {
         return event;
     }
 
-    public Payload getPayload() {
+    public JsonNode getPayload() {
         return payload;
     }
 
+    /**
+     * Helper to retrieve the value of "ref" from the payload
+     *
+     * @return The ref string or null if not found
+     */
     public String getRef() {
         if(ref != null) return ref;
-        return payload != null ? (String)payload.get("ref") : null;
+        final JsonNode refNode = payload.get("ref");
+        return refNode != null ? refNode.textValue() : null;
+    }
+
+    /**
+     * Helper to retrieve the value of "status" from the payload
+     *
+     * @return The status string or null if not found
+     */
+    public String getResponseStatus() {
+        final JsonNode statusNode = payload.get("status");
+        return statusNode == null ? null : statusNode.textValue();
+    }
+
+
+    /**
+     * Helper to retrieve the value of "reason" from the payload
+     *
+     * @return The reason string or null if not found
+     */
+    public String getReason() {
+        final JsonNode reasonNode = payload.get("reason");
+        return reasonNode == null ? null : reasonNode.textValue();
     }
 
     @Override

@@ -1,5 +1,7 @@
 package org.phoenixframework.channels;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
 import java.io.IOException;
 import java.util.*;
 import java.util.logging.Level;
@@ -11,13 +13,13 @@ public class Push {
     private Channel channel = null;
     private String event = null;
     private String refEvent = null;
-    private Payload payload = null;
+    private JsonNode payload = null;
     private Envelope receivedEnvelope = null;
     private Map<String, List<IMessageCallback>> recHooks = new HashMap<>();
     private boolean sent = false;
     private AfterHook afterHook;
 
-    Push(final Channel channel, final String event, final Payload payload) {
+    Push(final Channel channel, final String event, final JsonNode payload) {
         this.channel = channel;
         this.event = event;
         this.payload = payload;
@@ -33,9 +35,9 @@ public class Push {
      */
     public Push receive(final String status, final IMessageCallback callback) {
         if(this.receivedEnvelope != null) {
-            final String receivedStatus = this.receivedEnvelope.getPayload().getResponseStatus();
+            final String receivedStatus = this.receivedEnvelope.getResponseStatus();
             if(receivedStatus != null && receivedStatus.equals(status)) {
-                callback.onMessage(this.receivedEnvelope); // TODO - What is best to provide here. Polymorphic messages.
+                callback.onMessage(this.receivedEnvelope);
             }
         }
         synchronized(recHooks) {
@@ -81,7 +83,7 @@ public class Push {
             @Override
             public void onMessage(final Envelope envelope) {
                 Push.this.receivedEnvelope = envelope;
-                Push.this.matchReceive(((Payload)receivedEnvelope.getPayload()).getResponseStatus(), envelope, ref);
+                Push.this.matchReceive(receivedEnvelope.getResponseStatus(), envelope, ref);
                 Push.this.cancelRefEvent();
                 Push.this.cancelAfter();
             }
@@ -138,7 +140,7 @@ public class Push {
         return event;
     }
 
-    Payload getPayload() {
+    JsonNode getPayload() {
         return payload;
     }
 
