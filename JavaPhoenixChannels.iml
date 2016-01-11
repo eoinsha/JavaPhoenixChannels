@@ -21,12 +21,12 @@
     <orderEntry type="library" scope="TEST" name="Gradle: cglib:cglib-nodep:3.1" level="project" />
     <orderEntry type="library" scope="TEST" name="Gradle: org.objenesis:objenesis:2.1" level="project" />
     <orderEntry type="library" scope="TEST" name="Gradle: org.spockframework:spock-core:1.0-groovy-2.3" level="project" />
-    <orderEntry type="library" exported="" name="Gradle: org.codehaus.groovy:groovy-all:2.3.10" level="project" />
-    <orderEntry type="library" exported="" name="Gradle: com.squareup.okhttp:okhttp:2.4.0-RC1" level="project" />
-    <orderEntry type="library" exported="" name="Gradle: com.squareup.okio:okio:1.4.0" level="project" />
-    <orderEntry type="library" exported="" name="Gradle: com.squareup.okhttp:okhttp-ws:2.4.0-RC1" level="project" />
     <orderEntry type="library" exported="" name="Gradle: com.fasterxml.jackson.core:jackson-databind:2.5.3" level="project" />
     <orderEntry type="library" exported="" name="Gradle: com.fasterxml.jackson.core:jackson-annotations:2.5.0" level="project" />
     <orderEntry type="library" exported="" name="Gradle: com.fasterxml.jackson.core:jackson-core:2.5.3" level="project" />
+    <orderEntry type="library" name="Gradle: com.squareup.okhttp:okhttp-ws:2.7.2" level="project" />
+    <orderEntry type="library" name="Gradle: com.squareup.okhttp:okhttp:2.7.2" level="project" />
+    <orderEntry type="library" name="Gradle: com.squareup.okio:okio:1.6.0" level="project" />
+    <orderEntry type="library" scope="TEST" name="Gradle: org.codehaus.groovy:groovy-all:2.3.10" level="project" />
   </component>
 </module>
