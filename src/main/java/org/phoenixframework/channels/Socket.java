@@ -2,16 +2,16 @@ package org.phoenixframework.channels;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.BaseJsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.squareup.okhttp.OkHttpClient;
 import com.squareup.okhttp.Request;
+import com.squareup.okhttp.RequestBody;
 import com.squareup.okhttp.Response;
+import com.squareup.okhttp.ResponseBody;
 import com.squareup.okhttp.ws.WebSocket;
 import com.squareup.okhttp.ws.WebSocketCall;
 import com.squareup.okhttp.ws.WebSocketListener;
 import okio.Buffer;
-import okio.BufferedSource;
 
 import java.io.IOException;
 import java.util.*;
@@ -47,14 +47,14 @@ public class Socket {
      * Annotated WS Endpoint. Private member to prevent confusion with "onConn*" registration methods.
      */
     private PhoenixWSListener wsListener = new PhoenixWSListener();
-    private ConcurrentLinkedDeque<Buffer> sendBuffer = new ConcurrentLinkedDeque<>();
+    private ConcurrentLinkedDeque<RequestBody> sendBuffer = new ConcurrentLinkedDeque<>();
 
     public class PhoenixWSListener implements WebSocketListener {
         private PhoenixWSListener() {
         }
 
         @Override
-        public void onOpen(final WebSocket webSocket, final Request request, final Response response) throws IOException {
+        public void onOpen(final WebSocket webSocket, final Response response) {
             LOG.log(Level.FINE, "WebSocket onOpen: {0}", webSocket);
             Socket.this.webSocket = webSocket;
             cancelReconnectTimer();
@@ -68,13 +68,13 @@ public class Socket {
         }
 
         @Override
-        public void onMessage(final BufferedSource payload, final WebSocket.PayloadType type) throws IOException {
+        public void onMessage(final ResponseBody payload) throws IOException {
             LOG.log(Level.FINE, "Envelope received: {0}", payload);
 
             try {
-                if (type == WebSocket.PayloadType.TEXT) {
+                if (payload.contentType() == WebSocket.TEXT) {
                     final Envelope envelope =
-                            objectMapper.readValue(payload.inputStream(), Envelope.class);
+                        objectMapper.readValue(payload.byteStream(), Envelope.class);
                     for (final Channel channel : channels) {
                         if (channel.isMember(envelope.getTopic())) {
                             channel.trigger(envelope.getEvent(), envelope);
@@ -109,7 +109,7 @@ public class Socket {
         }
 
         @Override
-        public void onFailure(final IOException e) {
+        public void onFailure(final IOException e, final Response response) {
             LOG.log(Level.WARNING, "WebSocket connection error", e);
             try {
                 for (final IErrorCallback callback : errorCallbacks) {
@@ -240,18 +240,18 @@ public class Socket {
         node.set("payload", envelope.getPayload() == null ? objectMapper.createObjectNode() : envelope.getPayload());
         final String json = objectMapper.writeValueAsString(node);
         LOG.log(Level.FINE, "Sending JSON: {0}", json);
-        final Buffer payload = new Buffer();
-        payload.writeUtf8(json);
+
+        RequestBody body = RequestBody.create(WebSocket.TEXT, json);
 
         if (this.isConnected()) {
             try {
-                webSocket.sendMessage(WebSocket.PayloadType.TEXT, payload);
+                webSocket.sendMessage(body);
             }
             catch(IllegalStateException e) {
                 LOG.log(Level.SEVERE, "Attempted to send push when socket is not open", e);
             }
         } else {
-            this.sendBuffer.add(payload);
+            this.sendBuffer.add(body);
         }
 
         return this;
@@ -305,11 +305,11 @@ public class Socket {
     @Override
     public String toString() {
         return "PhoenixSocket{" +
-                "endpointUri='" + endpointUri + '\'' +
-                ", channels=" + channels +
-                ", refNo=" + refNo +
-                ", webSocket=" + webSocket +
-                '}';
+            "endpointUri='" + endpointUri + '\'' +
+            ", channels=" + channels +
+            ", refNo=" + refNo +
+            ", webSocket=" + webSocket +
+            '}';
     }
 
     synchronized String makeRef() {
@@ -328,11 +328,11 @@ public class Socket {
 
     private void flushSendBuffer() {
         while (this.isConnected() && !this.sendBuffer.isEmpty()) {
-            final Buffer buffer = this.sendBuffer.removeFirst();
+            final RequestBody body = this.sendBuffer.removeFirst();
             try {
-                this.webSocket.sendMessage(WebSocket.PayloadType.TEXT, buffer);
+                this.webSocket.sendMessage(body);
             } catch (IOException e) {
-                LOG.log(Level.SEVERE, "Failed to send payload {0}", buffer);
+                LOG.log(Level.SEVERE, "Failed to send payload {0}", body);
             }
         }
     }
