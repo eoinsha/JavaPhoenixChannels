@@ -24,6 +24,7 @@ public class Channel {
 
     private boolean joinedOnce = false;
     private ChannelState state = ChannelState.CLOSED;
+    public static long DEFAULT_TIMEOUT = 5000;
 
     private ConcurrentLinkedDeque<Push> pushBuffer = new ConcurrentLinkedDeque<>();
 
@@ -31,7 +32,7 @@ public class Channel {
         this.topic = topic;
         this.payload = payload;
         this.socket = socket;
-        this.joinPush = new Push(this, ChannelEvent.JOIN.getPhxEvent(), payload);
+        this.joinPush = new Push(this, ChannelEvent.JOIN.getPhxEvent(), payload, DEFAULT_TIMEOUT);
         this.channelTimer = new Timer("Phx Rejoin timer for " + topic);
 
         this.joinPush.receive("ok", new IMessageCallback() {
@@ -178,17 +179,18 @@ public class Channel {
      *
      * @param event The event name
      * @param payload The message payload
+     * @param timeout The number of milliseconds to wait before triggering a timeout
      *
      * @return The Push instance used to send the message
      *
      * @throws IOException Thrown if the payload cannot be pushed
      * @throws IllegalStateException Thrown if the channel has not yet been joined
      */
-    public Push push(final String event, final JsonNode payload) throws IOException, IllegalStateException {
+    public Push push(final String event, final JsonNode payload, final long timeout) throws IOException, IllegalStateException {
         if(!this.joinedOnce) {
             throw new IllegalStateException("Unable to push event before channel has been joined");
         }
-        final Push pushEvent = new Push(this, event, payload);
+        final Push pushEvent = new Push(this, event, payload, timeout);
         if(this.canPush()) {
             pushEvent.send();
         }
@@ -196,6 +198,10 @@ public class Channel {
             this.pushBuffer.add(pushEvent);
         }
         return pushEvent;
+    }
+
+    public Push push(final String event, final JsonNode payload) throws IOException {
+        return push(event, payload, DEFAULT_TIMEOUT);
     }
 
     public Push push(final String event) throws IOException {
@@ -234,12 +240,12 @@ public class Channel {
     @Override
     public String toString() {
         return "Channel{" +
-                "topic='" + topic + '\'' +
-                ", message=" + payload +
-                ", bindings=" + bindings +
-                '}';
+            "topic='" + topic + '\'' +
+            ", message=" + payload +
+            ", bindings=" + bindings +
+            '}';
     }
-    
+
     private void scheduleRejoinTimer() {
         final TimerTask rejoinTimerTask = new TimerTask() {
             @Override
