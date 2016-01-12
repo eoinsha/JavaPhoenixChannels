@@ -2,6 +2,7 @@ package org.phoenixframework.channels;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.squareup.okhttp.OkHttpClient;
 import com.squareup.okhttp.Request;
@@ -25,6 +26,8 @@ public class Socket {
 
     public static final int RECONNECT_INTERVAL_MS = 5000;
 
+    private static final int DEFAULT_HEARTBEAT_INTERVAL = 7000;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private final OkHttpClient httpClient = new OkHttpClient();
@@ -32,9 +35,11 @@ public class Socket {
 
     private String endpointUri = null;
     private final List<Channel> channels = new ArrayList<>();
+    private int heartbeatInterval;
 
     private Timer timer = null;
     private TimerTask reconnectTimerTask = null;
+    private TimerTask heartbeatTimerTask = null;
 
     private Set<ISocketOpenCallback> socketOpenCallbacks = Collections.newSetFromMap(new WeakHashMap<ISocketOpenCallback, Boolean>());
     private Set<ISocketCloseCallback> socketCloseCallbacks = Collections.newSetFromMap(new WeakHashMap<ISocketCloseCallback, Boolean>());
@@ -59,7 +64,8 @@ public class Socket {
             Socket.this.webSocket = webSocket;
             cancelReconnectTimer();
 
-            // TODO - Heartbeat
+            startHeartbeatTimer();
+
             for (final ISocketOpenCallback callback : socketOpenCallbacks) {
                 callback.onOpen();
             }
@@ -133,13 +139,38 @@ public class Socket {
         }
     }
 
+    private void startHeartbeatTimer(){
+        Socket.this.heartbeatTimerTask = new TimerTask() {
+            @Override
+            public void run() {
+                LOG.log(Level.FINE, "heartbeatTimerTask run");
+                if(Socket.this.isConnected()) {
+                    try {
+                        Envelope envelope = new Envelope("phoenix", "heartbeat", new ObjectNode(JsonNodeFactory.instance), Socket.this.makeRef());
+                        Socket.this.push(envelope);
+                    }
+                    catch (Exception e) {
+                        LOG.log(Level.SEVERE, "Failed to send heartbeat", e);
+                    }
+                }
+            }
+        };
+
+        timer.schedule(Socket.this.heartbeatTimerTask, Socket.this.heartbeatInterval);
+    }
+
+    private void cancelHeartbeatTimer(){
+        if (Socket.this.heartbeatTimerTask != null) {
+            Socket.this.heartbeatTimerTask.cancel();
+        }
+    }
+
     /**
      * Sets up and schedules a timer task to make repeated reconnect attempts at configured intervals
      */
     private void scheduleReconnectTimer() {
         cancelReconnectTimer();
-
-        // TODO - Clear heartbeat timer
+        cancelHeartbeatTimer();
 
         Socket.this.reconnectTimerTask = new TimerTask() {
             @Override
@@ -164,6 +195,14 @@ public class Socket {
     public Socket(final String endpointUri) throws IOException {
         LOG.log(Level.FINE, "PhoenixSocket({0})", endpointUri);
         this.endpointUri = endpointUri;
+        this.heartbeatInterval = DEFAULT_HEARTBEAT_INTERVAL;
+        this.timer = new Timer("Reconnect Timer for " + endpointUri);
+    }
+
+    public Socket(final String endpointUri, final int heartbeatIntervalInMs) throws IOException {
+        LOG.log(Level.FINE, "PhoenixSocket({0})", endpointUri);
+        this.endpointUri = endpointUri;
+        this.heartbeatInterval = heartbeatIntervalInMs;
         this.timer = new Timer("Reconnect Timer for " + endpointUri);
     }
 
@@ -171,6 +210,7 @@ public class Socket {
         LOG.log(Level.FINE, "disconnect");
         if (webSocket != null) {
             webSocket.close(1001 /*CLOSE_GOING_AWAY*/, "Disconnected by client");
+            cancelHeartbeatTimer();
         }
     }
 
