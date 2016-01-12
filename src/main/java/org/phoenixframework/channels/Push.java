@@ -17,12 +17,13 @@ public class Push {
     private Envelope receivedEnvelope = null;
     private Map<String, List<IMessageCallback>> recHooks = new HashMap<>();
     private boolean sent = false;
-    private AfterHook afterHook;
+    private TimeoutHook timeoutHook;
 
-    Push(final Channel channel, final String event, final JsonNode payload) {
+    Push(final Channel channel, final String event, final JsonNode payload, final long timeout) {
         this.channel = channel;
         this.event = event;
         this.payload = payload;
+        this.timeoutHook = new TimeoutHook(timeout);
     }
 
     /**
@@ -52,22 +53,23 @@ public class Push {
         return this;
     }
 
-    public Push after(final long ms, final Runnable callback) {
-        if(this.afterHook != null)
+    /**
+     * Registers for notification of message response timeout
+     *
+     * @param callback The callback handler called when timeout is reached
+     *
+     * @return This instance's self
+     */
+    public Push timeout(final ITimeoutCallback callback) {
+        if(this.timeoutHook.hasCallback())
             throw new IllegalStateException("Only a single after hook can be applied to a Push");
 
-        TimerTask timerTask = null;
+        this.timeoutHook.setCallback(callback);
+
         if(this.sent) {
-            timerTask = new TimerTask() {
-                @Override
-                public void run() {
-                    callback.run();
-                }
-            };
-            final Timer timer = new Timer("Phx after hook", true);
-            this.channel.scheduleTask(timerTask, ms);
+            startTimeout();
         }
-        this.afterHook = new AfterHook(ms, callback, timerTask);
+
         return this;
     }
 
@@ -83,45 +85,48 @@ public class Push {
             @Override
             public void onMessage(final Envelope envelope) {
                 Push.this.receivedEnvelope = envelope;
-                Push.this.matchReceive(receivedEnvelope.getResponseStatus(), envelope, ref);
+                Push.this.matchReceive(receivedEnvelope.getResponseStatus(), envelope);
                 Push.this.cancelRefEvent();
-                Push.this.cancelAfter();
+                Push.this.cancelTimeout();
             }
         });
 
-        this.startAfter();
+        this.startTimeout();
         this.sent = true;
         final Envelope envelope = new Envelope(this.channel.getTopic(), this.event, this.payload, ref);
         this.channel.getSocket().push(envelope);
     }
 
-    private void cancelAfter() {
-        if(this.afterHook != null) {
-            this.afterHook.getTimerTask().cancel();
-            this.afterHook.setTimerTask(null);
-        }
+    private void cancelTimeout() {
+        this.timeoutHook.getTimerTask().cancel();
+        this.timeoutHook.setTimerTask(null);
     }
 
-    private void startAfter() {
-        if(this.afterHook != null) {
-            final Runnable callback = new Runnable() {
-                @Override
-                public void run() {
-                    Push.this.cancelRefEvent();
-                    Push.this.afterHook.getCallback().run();
-                }
-            };
-            this.afterHook.setTimerTask(new TimerTask() {
-                @Override
-                public void run() {
-                    callback.run();
-                }
-            });
-            this.channel.scheduleTask(this.afterHook.getTimerTask(), this.afterHook.getMs());
-        }
+    private void startTimeout() {
+        this.timeoutHook.setTimerTask(createTimerTask());
+        this.channel.scheduleTask(this.timeoutHook.getTimerTask(), this.timeoutHook.getMs());
     }
 
-    private void matchReceive(final String status, final Envelope envelope, final String ref) {
+    private TimerTask createTimerTask(){
+        final Runnable callback = new Runnable() {
+            @Override
+            public void run() {
+                Push.this.cancelRefEvent();
+                if(Push.this.timeoutHook.hasCallback()) {
+                    Push.this.timeoutHook.getCallback().onTimeout();
+                }
+            }
+        };
+
+        return new TimerTask() {
+            @Override
+            public void run() {
+                callback.run();
+            }
+        };
+    }
+
+    private void matchReceive(final String status, final Envelope envelope) {
         synchronized (recHooks) {
             final List<IMessageCallback> statusCallbacks = this.recHooks.get(status);
             if(statusCallbacks != null) {
@@ -160,30 +165,37 @@ public class Push {
         this.channel.off(this.refEvent);
     }
 
-    private class AfterHook {
+    private class TimeoutHook {
         private final long ms;
-        private final Runnable callback;
+        private ITimeoutCallback callback;
         private TimerTask timerTask;
 
-        public AfterHook(final long ms, final Runnable callback, final TimerTask timerTask) {
+        public TimeoutHook(final long ms) {
             this.ms = ms;
-            this.callback = callback;
-            this.timerTask = timerTask;
         }
 
         public long getMs() {
             return ms;
         }
 
-        public Runnable getCallback() {
+        public ITimeoutCallback getCallback() {
             return callback;
         }
 
         public TimerTask getTimerTask() {
             return timerTask;
         }
+
         public void setTimerTask(final TimerTask timerTask) {
             this.timerTask = timerTask;
+        }
+
+        public boolean hasCallback(){
+            return this.callback != null;
+        }
+
+        public void setCallback(final ITimeoutCallback callback){
+            this.callback = callback;
         }
     }
 }

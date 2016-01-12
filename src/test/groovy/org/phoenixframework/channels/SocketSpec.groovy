@@ -5,7 +5,7 @@ import spock.util.concurrent.BlockingVariable
 
 class SocketSpec extends Specification {
 
-    def socket = new Socket("ws://localhost:4000/ws")
+    def socket = new Socket("ws://localhost:4000/socket/websocket")
 
     def socketOpenCallback = Mock(ISocketOpenCallback)
     def socketCloseCallback = Mock(ISocketCloseCallback)
@@ -27,7 +27,7 @@ class SocketSpec extends Specification {
         when:
         socket.connect()
         then:
-        1 * socketOpenCallback  .onOpen()
+        1 * socketOpenCallback.onOpen()
     }
 
     def "Channel subscribe"() {
