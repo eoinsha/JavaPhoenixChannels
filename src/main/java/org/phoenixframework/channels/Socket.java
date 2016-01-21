@@ -156,7 +156,7 @@ public class Socket {
             }
         };
 
-        timer.schedule(Socket.this.heartbeatTimerTask, Socket.this.heartbeatInterval);
+        timer.schedule(Socket.this.heartbeatTimerTask, Socket.this.heartbeatInterval, Socket.this.heartbeatInterval);
     }
 
     private void cancelHeartbeatTimer(){
