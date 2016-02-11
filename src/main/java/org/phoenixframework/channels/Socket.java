@@ -107,7 +107,6 @@ public class Socket {
         public void onClose(final int code, final String reason) {
             LOG.log(Level.FINE, "WebSocket onClose {0}/{1}", new Object[]{code, reason});
             Socket.this.webSocket = null;
-            scheduleReconnectTimer();
 
             for (final ISocketCloseCallback callback : socketCloseCallbacks) {
                 callback.onClose();
