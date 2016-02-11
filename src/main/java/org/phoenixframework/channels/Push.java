@@ -66,10 +66,6 @@ public class Push {
 
         this.timeoutHook.setCallback(callback);
 
-        if(this.sent) {
-            startTimeout();
-        }
-
         return this;
     }
 
