@@ -228,9 +228,14 @@ public class Channel {
         return socket;
     }
 
-    public void scheduleTask(TimerTask timerTask, long ms) {
+    public void scheduleRepeatingTask(TimerTask timerTask, long ms) {
         this.channelTimer.schedule(timerTask, ms, ms);
     }
+
+    public void scheduleTask(TimerTask timerTask, long ms) {
+        this.channelTimer.schedule(timerTask, ms);
+    }
+
 
     private void sendJoin() throws IOException {
         this.state = ChannelState.JOINING;
@@ -257,7 +262,7 @@ public class Channel {
                 }
             }
         };
-        scheduleTask(rejoinTimerTask, Socket.RECONNECT_INTERVAL_MS);
+        scheduleRepeatingTask(rejoinTimerTask, Socket.RECONNECT_INTERVAL_MS);
     }
 
 
