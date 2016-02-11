@@ -105,7 +105,10 @@ public class Channel {
         this.on(ChannelEvent.ERROR.getPhxEvent(), new IMessageCallback() {
             @Override
             public void onMessage(final Envelope envelope) {
-                final String reason = envelope.getReason();
+                String reason = null;
+                if (envelope != null) {
+                    reason = envelope.getReason();
+                }
                 callback.onError(reason);
             }
         });

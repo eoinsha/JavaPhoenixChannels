@@ -36,6 +36,7 @@ public class Socket {
     private String endpointUri = null;
     private final List<Channel> channels = new ArrayList<>();
     private int heartbeatInterval;
+    private boolean reconnectOnFailure = true;
 
     private Timer timer = null;
     private TimerTask reconnectTimerTask = null;
@@ -118,6 +119,9 @@ public class Socket {
             LOG.log(Level.WARNING, "WebSocket connection error", e);
             try {
                 for (final IErrorCallback callback : errorCallbacks) {
+
+                    //TODO if there are multiple errorCallbacks do we really want to trigger
+                    //the same channel error callbacks multiple times?
                     triggerChannelError();
                     callback.onError(e.toString());
                 }
@@ -133,7 +137,9 @@ public class Socket {
                         Socket.this.webSocket = null;
                     }
                 }
-                scheduleReconnectTimer();
+                if (reconnectOnFailure) {
+                    scheduleReconnectTimer();
+                }
             }
         }
     }
@@ -182,7 +188,7 @@ public class Socket {
                 }
             }
         };
-        timer.schedule(Socket.this.reconnectTimerTask, RECONNECT_INTERVAL_MS    );
+        timer.schedule(Socket.this.reconnectTimerTask, RECONNECT_INTERVAL_MS);
     }
 
     private void cancelReconnectTimer() {
@@ -192,10 +198,7 @@ public class Socket {
     }
 
     public Socket(final String endpointUri) throws IOException {
-        LOG.log(Level.FINE, "PhoenixSocket({0})", endpointUri);
-        this.endpointUri = endpointUri;
-        this.heartbeatInterval = DEFAULT_HEARTBEAT_INTERVAL;
-        this.timer = new Timer("Reconnect Timer for " + endpointUri);
+        this(endpointUri, DEFAULT_HEARTBEAT_INTERVAL);
     }
 
     public Socket(final String endpointUri, final int heartbeatIntervalInMs) throws IOException {
@@ -209,8 +212,8 @@ public class Socket {
         LOG.log(Level.FINE, "disconnect");
         if (webSocket != null) {
             webSocket.close(1001 /*CLOSE_GOING_AWAY*/, "Disconnected by client");
-            cancelHeartbeatTimer();
         }
+        cancelHeartbeatTimer();
     }
 
     public void connect() throws IOException {
@@ -349,6 +352,14 @@ public class Socket {
             ", refNo=" + refNo +
             ", webSocket=" + webSocket +
             '}';
+    }
+
+    /**
+     * Should the socket attempt to reconnect if websocket.onFailure is called.
+     * @param reconnectOnFailure reconnect value
+     */
+    public void reconectOnFailure(final boolean reconnectOnFailure) {
+        this.reconnectOnFailure = reconnectOnFailure;
     }
 
     synchronized String makeRef() {
