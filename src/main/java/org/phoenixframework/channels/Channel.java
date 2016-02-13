@@ -105,7 +105,10 @@ public class Channel {
         this.on(ChannelEvent.ERROR.getPhxEvent(), new IMessageCallback() {
             @Override
             public void onMessage(final Envelope envelope) {
-                final String reason = envelope.getReason();
+                String reason = null;
+                if (envelope != null) {
+                    reason = envelope.getReason();
+                }
                 callback.onError(reason);
             }
         });
@@ -228,9 +231,14 @@ public class Channel {
         return socket;
     }
 
-    public void scheduleTask(TimerTask timerTask, long ms) {
+    public void scheduleRepeatingTask(TimerTask timerTask, long ms) {
         this.channelTimer.schedule(timerTask, ms, ms);
     }
+
+    public void scheduleTask(TimerTask timerTask, long ms) {
+        this.channelTimer.schedule(timerTask, ms);
+    }
+
 
     private void sendJoin() throws IOException {
         this.state = ChannelState.JOINING;
@@ -257,7 +265,7 @@ public class Channel {
                 }
             }
         };
-        scheduleTask(rejoinTimerTask, Socket.RECONNECT_INTERVAL_MS);
+        scheduleRepeatingTask(rejoinTimerTask, Socket.RECONNECT_INTERVAL_MS);
     }
 
 
