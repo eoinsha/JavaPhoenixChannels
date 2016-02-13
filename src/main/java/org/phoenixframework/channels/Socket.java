@@ -12,6 +12,8 @@ import com.squareup.okhttp.ResponseBody;
 import com.squareup.okhttp.ws.WebSocket;
 import com.squareup.okhttp.ws.WebSocketCall;
 import com.squareup.okhttp.ws.WebSocketListener;
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.SSLSocketFactory;
 import okio.Buffer;
 
 import java.io.IOException;
@@ -374,6 +376,14 @@ public class Socket {
         for (final Channel channel : channels) {
             channel.trigger(ChannelEvent.ERROR.getPhxEvent(), null);
         }
+    }
+
+    public void setSSLSocketFactory(SSLSocketFactory sslSocketFactory) {
+        httpClient.setSslSocketFactory(sslSocketFactory);
+    }
+
+    public void setHostnameVerifier(HostnameVerifier hostnameVerifier) {
+        httpClient.setHostnameVerifier(hostnameVerifier);
     }
 
     private void flushSendBuffer() {
