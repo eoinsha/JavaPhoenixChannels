@@ -216,6 +216,7 @@ public class Socket {
             webSocket.close(1001 /*CLOSE_GOING_AWAY*/, "Disconnected by client");
         }
         cancelHeartbeatTimer();
+        cancelReconnectTimer();
     }
 
     public void connect() throws IOException {
