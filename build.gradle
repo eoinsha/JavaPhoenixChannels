@@ -11,7 +11,8 @@ if(project.hasProperty('signing.keyId'))
 
 group = 'org.phoenixframework.channels'
 version = '0.1.0'
-sourceCompatibility = '1.7.0'
+sourceCompatibility = '1.7'
+targetCompatibility = '1.6'
 
 dependencies {
   compile fileTree(dir: 'libs', include: ['*.jar'])
