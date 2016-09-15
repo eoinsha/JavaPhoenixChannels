@@ -84,9 +84,11 @@ public class Socket {
                 if (payload.contentType() == WebSocket.TEXT) {
                     final Envelope envelope =
                         objectMapper.readValue(payload.byteStream(), Envelope.class);
-                    for (final Channel channel : channels) {
-                        if (channel.isMember(envelope.getTopic())) {
-                            channel.trigger(envelope.getEvent(), envelope);
+                    synchronized (channels) {
+                        for (final Channel channel : channels) {
+                            if (channel.isMember(envelope.getTopic())) {
+                                channel.trigger(envelope.getEvent(), envelope);
+                            }
                         }
                     }
 
