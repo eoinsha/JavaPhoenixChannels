@@ -44,10 +44,10 @@ public class Socket {
     private TimerTask reconnectTimerTask = null;
     private TimerTask heartbeatTimerTask = null;
 
-    private Set<ISocketOpenCallback> socketOpenCallbacks = Collections.newSetFromMap(new WeakHashMap<ISocketOpenCallback, Boolean>());
-    private Set<ISocketCloseCallback> socketCloseCallbacks = Collections.newSetFromMap(new WeakHashMap<ISocketCloseCallback, Boolean>());
-    private Set<IErrorCallback> errorCallbacks = Collections.newSetFromMap(new WeakHashMap<IErrorCallback, Boolean>());
-    private Set<IMessageCallback> messageCallbacks = Collections.newSetFromMap(new WeakHashMap<IMessageCallback, Boolean>());
+    private Set<ISocketOpenCallback> socketOpenCallbacks = Collections.newSetFromMap(new HashMap<ISocketOpenCallback, Boolean>());
+    private Set<ISocketCloseCallback> socketCloseCallbacks = Collections.newSetFromMap(new HashMap<ISocketCloseCallback, Boolean>());
+    private Set<IErrorCallback> errorCallbacks = Collections.newSetFromMap(new HashMap<IErrorCallback, Boolean>());
+    private Set<IMessageCallback> messageCallbacks = Collections.newSetFromMap(new HashMap<IMessageCallback, Boolean>());
 
     private int refNo = 1;
 
