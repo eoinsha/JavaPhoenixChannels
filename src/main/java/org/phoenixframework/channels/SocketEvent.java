@@ -5,4 +5,4 @@ public enum SocketEvent {
     CLOSE,
     ERROR,
     MESSAGE
-};
+}

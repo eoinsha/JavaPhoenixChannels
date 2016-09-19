@@ -9,20 +9,20 @@ public enum ChannelEvent {
 
     private final String phxEvent;
 
-    private ChannelEvent(final String phxEvent) {
+    public static ChannelEvent getEvent(final String phxEvent) {
+        for (final ChannelEvent ev : values()) {
+            if (ev.getPhxEvent().equals(phxEvent)) {
+                return ev;
+            }
+        }
+        return null;
+    }
+
+    ChannelEvent(final String phxEvent) {
         this.phxEvent = phxEvent;
     }
 
     public String getPhxEvent() {
         return phxEvent;
-    }
-
-    public static ChannelEvent getEvent(final String phxEvent) {
-        for(final ChannelEvent ev : values()) {
-            if(ev.getPhxEvent().equals(phxEvent)) {
-                return ev;
-            }
-        }
-        return null;
     }
 }
