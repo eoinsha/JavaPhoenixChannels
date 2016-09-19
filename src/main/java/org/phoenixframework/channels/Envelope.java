@@ -1,6 +1,7 @@
 package org.phoenixframework.channels;
 
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 
@@ -59,6 +60,7 @@ public class Envelope {
      *
      * @return The status string or null if not found
      */
+    @JsonIgnore
     public String getResponseStatus() {
         final JsonNode statusNode = payload.get("status");
         return statusNode == null ? null : statusNode.textValue();
@@ -70,6 +72,7 @@ public class Envelope {
      *
      * @return The reason string or null if not found
      */
+    @JsonIgnore
     public String getReason() {
         final JsonNode reasonNode = payload.get("reason");
         return reasonNode == null ? null : reasonNode.textValue();

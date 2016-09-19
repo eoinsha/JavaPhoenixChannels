@@ -280,12 +280,8 @@ public class Socket {
      */
     public Socket push(final Envelope envelope) throws IOException {
         LOG.log(Level.FINE, "Pushing envelope: {0}", envelope);
-        final ObjectNode node = objectMapper.createObjectNode();
-        node.put("topic", envelope.getTopic());
-        node.put("event", envelope.getEvent());
-        node.put("ref", envelope.getRef());
-        node.set("payload", envelope.getPayload() == null ? objectMapper.createObjectNode() : envelope.getPayload());
-        final String json = objectMapper.writeValueAsString(node);
+
+        final String json = objectMapper.writeValueAsString(envelope);
         LOG.log(Level.FINE, "Sending JSON: {0}", json);
 
         RequestBody body = RequestBody.create(WebSocket.TEXT, json);
