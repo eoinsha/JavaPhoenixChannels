@@ -35,9 +35,6 @@ public class Socket {
 
     public class PhoenixWSListener implements WebSocketListener {
 
-        private PhoenixWSListener() {
-        }
-
         @Override
         public void onClose(final int code, final String reason) {
             LOG.log(Level.FINE, "WebSocket onClose {0}/{1}", new Object[]{code, reason});
