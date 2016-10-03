@@ -1,5 +1,5 @@
 plugins {
-    id "com.jfrog.bintray" version "1.6"
+    id "com.jfrog.bintray" version "1.7"
 }
 
 apply plugin: 'java'
@@ -11,7 +11,7 @@ if (project.hasProperty('signing.keyId')) {
 }
 
 group = 'org.phoenixframework.channels'
-version = '0.1.0'
+version = '0.2.0'
 
 allprojects {
     sourceCompatibility = 1.7
@@ -63,7 +63,7 @@ publishing {
             from components.java
             groupId 'com.github.eoinsha'
             artifactId 'JavaPhoenixChannels'
-            version '0.1'
+            version '0.2'
         }
     }
 }
@@ -74,6 +74,7 @@ bintray {
     pkg {
         repo = 'java-phoenix-channels'
         name = 'JavaPhoenixChannels'
+        userOrg = 'javaphoenixchannels'
         licenses = ['BSD-3']
         vcsUrl = 'https://github.com/eoinsha/JavaPhoenixChannels.git'
     }
