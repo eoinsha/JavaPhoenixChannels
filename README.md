@@ -1,16 +1,27 @@
 # Phoenix Channel Client for Java and Android
 
-Work in Progress
+JavaPhoenixChannels is a Java and Android client library for the Channels API in the (http://www.phoenixframework.org/)[Phoenix Framework]. Its primary purpose is to ease development of real time messaging apps for Android using an Elixir/Phoenix backend. For more about the Elixir language and the massively scalable and reliable systems you can build with Phoenix, see (http://elixir-lang.org/) and (http://www.phoenixframework.org).
 
-## Building
+## Including the Library
 
-Using Gradle 2.2.1 or later:
-
-```shell
-gradle build
+- Add `http://dl.bintray.com/javaphoenixchannels/java-phoenix-channels` as a Maven repository
+- Add JavaPhoenixChannels as an app dependency:
 ```
+dependencies {
+  ...
+  compile('com.github.eoinsha:JavaPhoenixChannels:0.2') {
+      exclude module: 'groovy-all'
+  }
+```
+- For Maven or Gradle-specific instructions detailing how this is done, see the "SET ME UP" section on https://bintray.com/javaphoenixchannels/java-phoenix-channels/JavaPhoenixChannels and choose "Resolving artifacts..."
 
-Examples below are used with the [Phoenix Chat Example](https://github.com/chrismccord/phoenix_chat_example)
+# Examples
+
+## Example Android App
+
+For a full sample Android chat app, check out the repository at https://github.com/eoinsha/PhoenixChatAndroid
+
+The quick examples below are used with the [Phoenix Chat Example](https://github.com/chrismccord/phoenix_chat_example)
 
 ## Example using Groovy
 ```groovy
@@ -79,3 +90,7 @@ ObjectNode node = new ObjectNode(JsonNodeFactory.instance)
 
 channel.push("new:msg", node);
 ```
+
+# Contributing
+
+To contribute, see the contribution guidelines and instructions in (./CONTRIBUTING.md)
