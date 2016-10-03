@@ -44,4 +44,11 @@ export BINTRAY_KEY=...
 gradle bintrayUpload
 ```
 
+Tag the new version:
+```
+git tag -a v0.2.0
+git push origin v0.2.0
+```
+
+At this point, you have to go to the Bintray web interface and click 'publish' for the new version.
 
