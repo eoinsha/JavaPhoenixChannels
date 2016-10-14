@@ -13,7 +13,7 @@ dependencies {
       exclude module: 'groovy-all'
   }
 ```
-- For Maven or Gradle-specific instructions detailing how this is done, see the "SET ME UP" section on https://bintray.com/eoinsha/java-phoenix-channels/JavaPhoenixChannels and choose "Resolving artifacts..."
+- For Maven or Gradle-specific instructions detailing how this is done, see the "SET ME UP" section on https://bintray.com/javaphoenixchannels/java-phoenix-channels/JavaPhoenixChannels and choose "Resolving artifacts..."
 
 # Examples
 
