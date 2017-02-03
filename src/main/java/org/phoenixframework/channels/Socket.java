@@ -125,7 +125,7 @@ public class Socket {
 
     private static final int DEFAULT_HEARTBEAT_INTERVAL = 7000;
 
-    private final List<Channel> channels = new CopyOnWriteArrayList<>();
+    private final List<Channel> channels = new ArrayList<>();
 
     private String endpointUri = null;
 
