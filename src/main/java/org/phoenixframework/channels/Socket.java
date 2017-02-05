@@ -451,14 +451,14 @@ public class Socket {
         return "chan_reply_" + ref;
     }
 
-    private void handleOnSocketException(String method, Throwable e) {
-        LOG.log(Level.SEVERE, "Something went terribly wrong! Catching all throwables", e);
+    private void handleOnSocketException(String methodName, Throwable e) {
+        LOG.log(Level.SEVERE, "Something went terribly wrong in " + methodName + "() - Catching all throwables", e);
         if (onSocketThrowExceptionListener != null) {
-            onSocketThrowExceptionListener.onThrowException(e);
+            onSocketThrowExceptionListener.onThrowException(methodName, e);
         }
     }
 
     public interface OnSocketThrowExceptionListener {
-        void onThrowException(Throwable e);
+        void onThrowException(String method, Throwable e);
     }
 }
