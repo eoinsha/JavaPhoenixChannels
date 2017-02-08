@@ -79,11 +79,9 @@ public class Socket {
                 if (payload.contentType() == WebSocket.TEXT) {
                     final Envelope envelope =
                             objectMapper.readValue(payload.byteStream(), Envelope.class);
-                    synchronized (channels) {
-                        for (final Channel channel : channels) {
-                            if (channel.isMember(envelope.getTopic())) {
-                                channel.trigger(envelope.getEvent(), envelope);
-                            }
+                    for (final Channel channel : getChannels()) {
+                        if (channel.isMember(envelope.getTopic())) {
+                            channel.trigger(envelope.getEvent(), envelope);
                         }
                     }
 
@@ -442,7 +440,7 @@ public class Socket {
     }
 
     private void triggerChannelError() {
-        for (final Channel channel : channels) {
+        for (final Channel channel : getChannels()) {
             channel.trigger(ChannelEvent.ERROR.getPhxEvent(), null);
         }
     }
@@ -460,5 +458,11 @@ public class Socket {
 
     public interface OnSocketThrowExceptionListener {
         void onThrowException(String method, Throwable e);
+    }
+
+    private List<Channel> getChannels() {
+        synchronized (channels) {
+            return new ArrayList<>(channels);
+        }
     }
 }
