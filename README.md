@@ -69,17 +69,17 @@ channel.on("new:msg", new IMessageCallback() {
     }
 });
 
-channel.onClose(new IMessageCallback() {
+channel.on(ChannelEvent.CLOSE.getPhxEvent(), new IMessageCallback() {
     @Override
     public void onMessage(Envelope envelope) {
         System.out.println("CLOSED: " + envelope.toString());
     }
 });
 
-channel.onError(new IErrorCallback() {
+channel.on(ChannelEvent.ERROR.getPhxEvent(), new IMessageCallback() {
     @Override
-    public void onError(String reason) {
-        System.out.println("ERROR: " + reason);
+    public void onMessage(Envelope envelope) {
+        System.out.println("ERROR: " + envelope.toString());
     }
 });
 
