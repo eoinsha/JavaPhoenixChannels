@@ -35,6 +35,8 @@ public class Socket {
         @Override
         public void onClose(final int code, final String reason) {
             LOG.log(Level.FINE, "WebSocket onClose {0}/{1}", new Object[]{code, reason});
+            cancelReconnectTimer();
+            cancelHeartbeatTimer();
             Socket.this.webSocket = null;
 
             for (final ISocketCloseCallback callback : socketCloseCallbacks) {
@@ -54,6 +56,9 @@ public class Socket {
                     callback.onError(e.toString());
                 }
             } finally {
+                cancelReconnectTimer();
+                cancelHeartbeatTimer();
+
                 // Assume closed on failure
                 if (Socket.this.webSocket != null) {
                     try {
@@ -205,12 +210,13 @@ public class Socket {
     }
 
     public void disconnect() throws IOException {
+        cancelReconnectTimer();
+        cancelHeartbeatTimer();
+
         LOG.log(Level.FINE, "disconnect");
         if (webSocket != null) {
             webSocket.close(1001 /*CLOSE_GOING_AWAY*/, "Disconnected by client");
         }
-        cancelHeartbeatTimer();
-        cancelReconnectTimer();
     }
 
     /**
@@ -393,6 +399,8 @@ public class Socket {
     }
 
     private void startHeartbeatTimer() {
+        cancelHeartbeatTimer();
+
         Socket.this.heartbeatTimerTask = new TimerTask() {
             @Override
             public void run() {
