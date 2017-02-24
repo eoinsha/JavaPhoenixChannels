@@ -337,12 +337,14 @@ public class Socket {
 
     @Override
     public String toString() {
-        return "PhoenixSocket{" +
-                "endpointUri='" + endpointUri + '\'' +
-                ", channels=" + channels +
-                ", refNo=" + refNo +
-                ", webSocket=" + webSocket +
-                '}';
+        synchronized (channels) {
+            return "PhoenixSocket{" +
+                    "endpointUri='" + endpointUri + '\'' +
+                    ", channels=" + channels +
+                    ", refNo=" + refNo +
+                    ", webSocket=" + webSocket +
+                    '}';
+        }
     }
 
     synchronized String makeRef() {
@@ -422,8 +424,10 @@ public class Socket {
     }
 
     private void triggerChannelError() {
-        for (final Channel channel : channels) {
-            channel.trigger(ChannelEvent.ERROR.getPhxEvent(), null);
+        synchronized (channels) {
+            for (final Channel channel : channels) {
+                channel.trigger(ChannelEvent.ERROR.getPhxEvent(), null);
+            }
         }
     }
 
