@@ -6,14 +6,8 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Set;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -97,6 +91,8 @@ public class Socket {
                 }
             } catch (IOException e) {
                 LOG.log(Level.SEVERE, "Failed to read message payload", e);
+            } catch (ConcurrentModificationException e) {
+                LOG.log(Level.SEVERE, "ConcurrentModificationException!", e);
             } finally {
                 payload.close();
             }
