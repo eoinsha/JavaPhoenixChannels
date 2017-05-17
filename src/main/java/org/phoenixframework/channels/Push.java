@@ -8,10 +8,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TimerTask;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class Push {
+
+    private static final Logger log = LoggerFactory.getLogger(Push.class);
 
     private class TimeoutHook {
 
@@ -49,8 +52,6 @@ public class Push {
             this.timerTask = timerTask;
         }
     }
-
-    private static final Logger LOG = Logger.getLogger(Push.class.getName());
 
     private Channel channel = null;
 
@@ -143,7 +144,7 @@ public class Push {
 
     void send() throws IOException {
         final String ref = channel.getSocket().makeRef();
-        LOG.log(Level.FINE, "Push send, ref={0}", ref);
+        log.trace("Push send, ref={}", ref);
 
         this.refEvent = Socket.replyEventName(ref);
         this.receivedEnvelope = null;
@@ -160,8 +161,7 @@ public class Push {
 
         this.startTimeout();
         this.sent = true;
-        final Envelope envelope = new Envelope(this.channel.getTopic(), this.event, this.payload,
-                ref);
+        final Envelope envelope = new Envelope(this.channel.getTopic(), this.event, this.payload, ref);
         this.channel.getSocket().push(envelope);
     }
 

@@ -9,17 +9,18 @@ import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.LinkedBlockingDeque;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Encapsulation of a Phoenix channel: a Socket, a topic and the channel's state.
  */
 public class Channel {
 
-    private static final Logger LOG = Logger.getLogger(Channel.class.getName());
-
     private static final long DEFAULT_TIMEOUT = 5000;
+
+    private static final Logger log = LoggerFactory.getLogger(Channel.class);
 
     private final List<Binding> bindings = new ArrayList<>();
 
@@ -113,7 +114,7 @@ public class Channel {
     public Push join() throws IllegalStateException, IOException {
         if (this.joinedOnce) {
             throw new IllegalStateException(
-                    "Tried to join multiple times. 'join' can only be invoked once per channel");
+                "Tried to join multiple times. 'join' can only be invoked once per channel");
         }
         this.joinedOnce = true;
         this.sendJoin();
@@ -137,7 +138,7 @@ public class Channel {
     public Channel off(final String event) {
         synchronized (bindings) {
             for (final Iterator<Binding> bindingIter = bindings.iterator();
-                    bindingIter.hasNext(); ) {
+                 bindingIter.hasNext(); ) {
                 if (bindingIter.next().getEvent().equals(event)) {
                     bindingIter.remove();
                     break;
@@ -192,7 +193,7 @@ public class Channel {
      * @throws IllegalStateException Thrown if the channel has not yet been joined
      */
     private Push push(final String event, final JsonNode payload, final long timeout)
-            throws IOException, IllegalStateException {
+        throws IOException, IllegalStateException {
         if (!this.joinedOnce) {
             throw new IllegalStateException("Unable to push event before channel has been joined");
         }
@@ -241,10 +242,10 @@ public class Channel {
     @Override
     public String toString() {
         return "Channel{" +
-                "topic='" + topic + '\'' +
-                ", message=" + payload +
-                ", bindings=" + bindings +
-                '}';
+            "topic='" + topic + '\'' +
+            ", message=" + payload +
+            ", bindings(" + bindings.size() + ")=" + bindings +
+            '}';
     }
 
     /**
@@ -272,7 +273,7 @@ public class Channel {
                 try {
                     Channel.this.rejoinUntilConnected();
                 } catch (IOException e) {
-                    LOG.log(Level.SEVERE, "Failed to rejoin", e);
+                    log.error("Failed to rejoin", e);
                 }
             }
         };
