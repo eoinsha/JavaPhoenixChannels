@@ -4,25 +4,22 @@ package org.phoenixframework.channels;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 
-import java.util.logging.Logger;
-
 public class Envelope {
-    private static final Logger LOG = Logger.getLogger(Socket.class.getName());
-
     @JsonProperty
     private String topic;
 
     @JsonProperty
     private String event;
 
-    @JsonProperty(value="payload")
+    @JsonProperty(value = "payload")
     private JsonNode payload;
 
     @JsonProperty
     private String ref;
 
     @SuppressWarnings("unused")
-    public Envelope() {}
+    public Envelope() {
+    }
 
     public Envelope(final String topic, final String event, final JsonNode payload, final String ref) {
         this.topic = topic;
@@ -49,7 +46,7 @@ public class Envelope {
      * @return The ref string or null if not found
      */
     public String getRef() {
-        if(ref != null) return ref;
+        if (ref != null) return ref;
         final JsonNode refNode = payload.get("ref");
         return refNode != null ? refNode.textValue() : null;
     }
@@ -64,7 +61,6 @@ public class Envelope {
         return statusNode == null ? null : statusNode.textValue();
     }
 
-
     /**
      * Helper to retrieve the value of "reason" from the payload
      *
@@ -78,9 +74,9 @@ public class Envelope {
     @Override
     public String toString() {
         return "Envelope{" +
-                "topic='" + topic + '\'' +
-                ", event='" + event + '\'' +
-                ", payload=" + payload +
-                '}';
+            "topic='" + topic + '\'' +
+            ", event='" + event + '\'' +
+            ", payload=" + payload +
+            '}';
     }
 }
