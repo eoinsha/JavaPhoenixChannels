@@ -67,6 +67,16 @@ publishing {
             version '0.2'
         }
     }
+    repositories {
+        maven {
+            name 'Nexus'
+            url 'http://maven.grindr.com:8081'
+            credentials {
+                username System.getenv('NEXUS_USER')
+                password System.getenv('NEXUS_PASSWORD')
+            }
+        }
+    }
 }
 
 bintray {
