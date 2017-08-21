@@ -100,8 +100,17 @@ public class Channel {
         return topic;
     }
 
-    public boolean isMember(final String topic) {
-        return this.topic.equals(topic);
+    public boolean isMember(final String topic, final String event, final JsonNode payload, final String joinRef) {
+        if (!this.topic.equals(topic)) {
+            return false;
+        }
+        if (joinRef != null && joinRef != this.joinRef()) {
+            log.info("dropping outdated message topic: %s, event: %s, joinRef: %s",
+                    topic, event, joinRef);
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -285,5 +294,8 @@ public class Channel {
         this.joinPush.send();
     }
 
+    public String joinRef() {
+        return this.joinPush.getReceivedEnvelope().getRef();
+    }
 
 }

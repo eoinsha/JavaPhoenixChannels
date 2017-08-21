@@ -161,8 +161,15 @@ public class Push {
 
         this.startTimeout();
         this.sent = true;
-        final Envelope envelope = new Envelope(this.channel.getTopic(), this.event, this.payload, ref);
+        final Envelope envelope = new Envelope(this.channel.getTopic(), this.event, this.payload, ref, this.channel.joinRef());
         this.channel.getSocket().push(envelope);
+    }
+
+    private void reset() {
+        this.cancelRefEvent();
+        this.refEvent = null;
+        this.receivedEnvelope = null;
+        this.sent = false;
     }
 
     private void cancelRefEvent() {

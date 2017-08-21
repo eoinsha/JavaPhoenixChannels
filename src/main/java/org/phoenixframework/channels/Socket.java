@@ -328,11 +328,8 @@ public class Socket {
     }
 
     synchronized String makeRef() {
-        int val = refNo++;
-        if (refNo == Integer.MAX_VALUE) {
-            refNo = 0;
-        }
-        return Integer.toString(val);
+        refNo = (refNo + 1) % Integer.MAX_VALUE;
+        return Integer.toString(refNo);
     }
 
     private void cancelHeartbeatTimer() {
