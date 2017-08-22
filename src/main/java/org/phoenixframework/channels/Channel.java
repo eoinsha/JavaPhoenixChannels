@@ -302,7 +302,7 @@ public class Channel {
     }
 
     public String joinRef() {
-        return this.joinPush.getReceivedEnvelope().getRef();
+        return this.joinPush.getRef();
     }
 
 }
