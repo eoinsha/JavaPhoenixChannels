@@ -56,6 +56,17 @@ public class Envelope {
     }
 
     /**
+     * Helper to retrieve the value of "join_ref" from the payload
+     *
+     * @return The join_ref string or null if not found
+     */
+    public String getJoinRef() {
+        if (join_ref != null) return join_ref;
+        final JsonNode joinRefNode = payload.get("join_ref");
+        return joinRefNode != null ? joinRefNode.textValue() : null;
+    }
+
+    /**
      * Helper to retrieve the value of "status" from the payload
      *
      * @return The status string or null if not found

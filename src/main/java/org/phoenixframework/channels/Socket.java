@@ -57,7 +57,7 @@ public class Socket {
                 final Envelope envelope = objectMapper.readValue(text, Envelope.class);
                 synchronized (channels) {
                     for (final Channel channel : channels) {
-                        if (channel.isMember(envelope.getTopic())) {
+                        if (channel.isMember(envelope)) {
                             channel.trigger(envelope.getEvent(), envelope);
                         }
                     }
@@ -270,6 +270,7 @@ public class Socket {
         node.put("topic", envelope.getTopic());
         node.put("event", envelope.getEvent());
         node.put("ref", envelope.getRef());
+        node.put("join_ref", envelope.getJoinRef());
         node.set("payload", envelope.getPayload() == null ? objectMapper.createObjectNode() : envelope.getPayload());
         final String json = objectMapper.writeValueAsString(node);
 
@@ -381,7 +382,7 @@ public class Socket {
                 if (Socket.this.isConnected()) {
                     try {
                         Envelope envelope = new Envelope("phoenix", "heartbeat",
-                            new ObjectNode(JsonNodeFactory.instance), Socket.this.makeRef());
+                            new ObjectNode(JsonNodeFactory.instance), Socket.this.makeRef(), null);
                         Socket.this.push(envelope);
                     } catch (Exception e) {
                         log.error("Failed to send heartbeat", e);

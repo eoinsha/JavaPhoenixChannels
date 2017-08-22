@@ -100,11 +100,18 @@ public class Channel {
         return topic;
     }
 
-    public boolean isMember(final String topic, final String event, final JsonNode payload, final String joinRef) {
+    public boolean isMember(final Envelope envelope) {
+        String topic = envelope.getTopic();
+        String event = envelope.getEvent();
+        String joinRef = envelope.getJoinRef();
+
         if (!this.topic.equals(topic)) {
             return false;
         }
-        if (joinRef != null && joinRef != this.joinRef()) {
+
+        boolean isLifecycleEvent = ChannelEvent.getEvent(event) != null;
+
+        if (joinRef != null && isLifecycleEvent && joinRef != this.joinRef()) {
             log.info("dropping outdated message topic: %s, event: %s, joinRef: %s",
                     topic, event, joinRef);
             return false;
