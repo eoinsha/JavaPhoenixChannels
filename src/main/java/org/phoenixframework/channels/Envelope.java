@@ -4,6 +4,8 @@ package org.phoenixframework.channels;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 
+// To fix UnrecognizedPropertyException.
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Envelope {
     @JsonProperty
     private String topic;
