@@ -5,16 +5,16 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 
 public class Envelope {
-    @JsonProperty
+    @JsonProperty(value = "topic")
     private String topic;
 
-    @JsonProperty
+    @JsonProperty(value = "event")
     private String event;
 
     @JsonProperty(value = "payload")
     private JsonNode payload;
 
-    @JsonProperty
+    @JsonProperty(value = "ref")
     private String ref;
 
     @SuppressWarnings("unused")
