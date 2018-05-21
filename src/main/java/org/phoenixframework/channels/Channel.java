@@ -285,5 +285,19 @@ public class Channel {
         this.joinPush.send();
     }
 
+    public boolean isJoined() {
+        return state == ChannelState.JOINED;
+    }
 
+    public boolean isErrored() {
+        return state == ChannelState.ERRORED;
+    }
+
+    public boolean isClosed() {
+        return state == ChannelState.CLOSED;
+    }
+
+    public boolean isJoining() {
+        return state == ChannelState.JOINING;
+    }
 }
