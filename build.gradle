@@ -11,7 +11,7 @@ if (project.hasProperty('signing.keyId')) {
 }
 
 group = 'org.phoenixframework.channels'
-version = '0.2.0'
+version = '0.2.1'
 
 allprojects {
     sourceCompatibility = 1.7
@@ -20,8 +20,8 @@ allprojects {
 
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
-    compile 'com.fasterxml.jackson.core:jackson-databind:2.8.3'
-    compile 'com.squareup.okhttp3:okhttp:3.6.0'
+    compile 'com.fasterxml.jackson.core:jackson-databind:2.9.5'
+    compile 'com.squareup.okhttp3:okhttp:3.10.0'
     compile 'org.slf4j:slf4j-api:1.7.22'
     testCompile 'org.codehaus.groovy:groovy-all:2.3.10'
     testCompile "org.spockframework:spock-core:1.0-groovy-2.3"
