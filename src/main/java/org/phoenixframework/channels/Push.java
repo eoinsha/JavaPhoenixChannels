@@ -69,6 +69,8 @@ public class Push {
 
     private final TimeoutHook timeoutHook;
 
+    private String ref;
+
     Push(final Channel channel, final String event, final JsonNode payload, final long timeout) {
         this.channel = channel;
         this.event = event;
@@ -130,6 +132,8 @@ public class Push {
         return payload;
     }
 
+    public String getRef() { return ref; }
+
     Map<String, List<IMessageCallback>> getRecHooks() {
         return recHooks;
     }
@@ -143,7 +147,7 @@ public class Push {
     }
 
     void send() throws IOException {
-        final String ref = channel.getSocket().makeRef();
+        this.ref = channel.getSocket().makeRef();
         log.trace("Push send, ref={}", ref);
 
         this.refEvent = Socket.replyEventName(ref);
@@ -161,8 +165,15 @@ public class Push {
 
         this.startTimeout();
         this.sent = true;
-        final Envelope envelope = new Envelope(this.channel.getTopic(), this.event, this.payload, ref);
+        final Envelope envelope = new Envelope(this.channel.getTopic(), this.event, this.payload, this.ref, this.channel.joinRef());
         this.channel.getSocket().push(envelope);
+    }
+
+    private void reset() {
+        this.cancelRefEvent();
+        this.refEvent = null;
+        this.receivedEnvelope = null;
+        this.sent = false;
     }
 
     private void cancelRefEvent() {
