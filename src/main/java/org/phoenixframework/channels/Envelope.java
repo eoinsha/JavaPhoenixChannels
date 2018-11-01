@@ -7,16 +7,16 @@ import com.fasterxml.jackson.databind.JsonNode;
 // To fix UnrecognizedPropertyException.
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Envelope {
-    @JsonProperty
+    @JsonProperty(value = "topic")
     private String topic;
 
-    @JsonProperty
+    @JsonProperty(value = "event")
     private String event;
 
     @JsonProperty(value = "payload")
     private JsonNode payload;
 
-    @JsonProperty
+    @JsonProperty(value = "ref")
     private String ref;
 
     @JsonProperty
