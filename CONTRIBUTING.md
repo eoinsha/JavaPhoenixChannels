@@ -32,7 +32,7 @@ For any contribution, there are a few guidelines that need to be followed.
 Using Gradle 2.2.1 or later:
 
 ```shell
-gradle build
+./gradlew build
 ```
 
 # Release and Publication
@@ -41,13 +41,13 @@ In order to release, you require full contributor rights and a Bintray account w
 ```
 export BINTRAY_USER=...
 export BINTRAY_KEY=...
-gradle bintrayUpload
+./gradlew bintrayUpload
 ```
 
 Tag the new version:
 ```
-git tag -a v0.2.0
-git push origin v0.2.0
+git tag -a v1.0.0
+git push origin v1.0.0
 ```
 
 At this point, you have to go to the Bintray web interface and click 'publish' for the new version.
