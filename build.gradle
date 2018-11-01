@@ -11,7 +11,7 @@ if (project.hasProperty('signing.keyId')) {
 }
 
 group = 'org.phoenixframework.channels'
-version = '0.2.0'
+version = '0.2.1'
 
 allprojects {
     sourceCompatibility = 1.7
