@@ -9,7 +9,7 @@ JavaPhoenixChannels is a Java and Android client library for the Channels API in
 ```
 dependencies {
   ...
-  compile('com.github.eoinsha:JavaPhoenixChannels:0.2') {
+  compile('com.github.eoinsha:JavaPhoenixChannels:1.0') {
       exclude module: 'groovy-all'
   }
 ```
