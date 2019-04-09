@@ -43,7 +43,11 @@ import org.phoenixframework.channels.*;
 Socket socket;
 Channel channel;
 
-socket = new Socket("ws://localhost:4000/socket/websocket");
+// To connect with authentication
+String authToken = "abc123"
+Uri.Builder url = Uri.parse( "ws://localhost:4000/socket/websocket" ).buildUpon();
+url.appendQueryParameter( "auth_token", authToken );
+socket = new Socket(url.build().toString());
 socket.connect();
 
 channel = socket.chan("rooms:lobby", null);
